@@ -36,6 +36,7 @@ impl<'a> SlabCache<'a, 'a> {
 }
 
 #[derive(Debug)]
+/// See [ObjectSizeType::Small] and [ObjectSizeType::Large]
 enum ObjectSizeType {
     /// For small size objects, SlabInfo is stored directly in slab and little memory is lost.
     /// For example:
