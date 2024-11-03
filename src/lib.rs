@@ -1,7 +1,7 @@
 #![no_std]
 extern crate alloc;
 
-use intrusive_collections::{LinkedList, LinkedListLink, intrusive_adapter};
+use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 
 /// Slab cache for OS
 
@@ -23,7 +23,12 @@ struct Cache<'a, 'b, T> {
 impl<'a, T> Cache<'a, '_, T> {
     /// slab_size must be power of two
     /// size of T must be >= 16 (two pointers)
-    pub fn new(slab_size: usize, page_size: usize, object_size_type: ObjectSizeType, memory_backend: &'a mut dyn MemoryBackend<T>) -> Result<Self, ()> {
+    pub fn new(
+        slab_size: usize,
+        page_size: usize,
+        object_size_type: ObjectSizeType,
+        memory_backend: &'a mut dyn MemoryBackend<T>,
+    ) -> Result<Self, ()> {
         let object_size = size_of::<T>();
         if object_size < size_of::<FreeObject>() {
             return Err(());
@@ -33,13 +38,18 @@ impl<'a, T> Cache<'a, '_, T> {
         }
 
         let slab = memory_backend.alloc_slab(slab_size);
+        if slab.is_null() {
+            return Err(());
+        }
+
+        let free_slabs_list = LinkedList::new(SlabInfoAdapter::new());
 
         Ok(Self {
             object_size,
             slab_size,
             page_size,
             object_size_type,
-            free_slabs_list: LinkedList::new(SlabInfoAdapter::new()),
+            free_slabs_list,
             full_slabs_list: LinkedList::new(SlabInfoAdapter::new()),
             memory_backend,
         })
@@ -104,8 +114,7 @@ intrusive_adapter!(FreeObjectAdapter<'a> = &'a FreeObject: FreeObject { free_obj
 /// Slab caching logic can be placed here
 ///
 /// alloc_slab_info() and free_slab_info() not used by small objects cache and can always return null
-trait MemoryBackend<T>
-{
+trait MemoryBackend<T> {
     /// Allocates slab for cache
     ///
     /// slab_size always power of two and greater than page_size
@@ -131,8 +140,8 @@ trait MemoryBackend<T>
 
 #[cfg(test)]
 mod tests {
-    use alloc::alloc::{ Layout, alloc, dealloc };
     use super::*;
+    use alloc::alloc::{alloc, dealloc, Layout};
     #[test]
     fn alloc_from_small() {
         struct TestMemoryBackend {
@@ -160,16 +169,20 @@ mod tests {
                 unreachable!();
             }
         }
-        let mut test_memory_backend = TestMemoryBackend {
-            page_size: 4096,
-        };
+        let mut test_memory_backend = TestMemoryBackend { page_size: 4096 };
 
         struct SomeType {
             a: usize,
             b: usize,
         }
 
-        let mut slab_cache = Cache::<SomeType>::new(4096, test_memory_backend.page_size, ObjectSizeType::Small, &mut test_memory_backend).expect("Failed to create cache");
+        let mut slab_cache = Cache::<SomeType>::new(
+            4096,
+            test_memory_backend.page_size,
+            ObjectSizeType::Small,
+            &mut test_memory_backend,
+        )
+        .expect("Failed to create cache");
         let allocated_ptr = slab_cache.alloc();
         assert!(!allocated_ptr.is_null());
         slab_cache.free(allocated_ptr);
