@@ -37,7 +37,19 @@ impl<'a> SlabCache<'a, 'a> {
 
 #[derive(Debug)]
 enum ObjectSizeType {
+    /// For small size objects, SlabInfo is stored directly in slab and little memory is lost.
+    /// For example:
+    /// slab size: 4096
+    /// object size: 32
+    /// slab info: 40
+    /// We will be able to place 126 objects, this will consume 4032 bytes, the 40 bytes will be occupied by SlabInfo, only 24 bytes will be lost, all is well.
     Small,
+    /// For large size objects, SlabInfo can't be stored directly in slab and allocates using MemoryBackend.
+    /// For example:
+    /// slab size: 4096
+    /// object size: 2048
+    /// slab info: 40
+    /// We will be able to place only 1 objects, this will consume 2048 bytes, the 40 bytes will be occupied by SlabInfo, 2008 bytes will be lost!
     Large,
 }
 
