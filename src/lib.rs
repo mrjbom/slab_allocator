@@ -1,8 +1,8 @@
 //#![no_std]
+#![allow(unused)]
 
 use core::cell::UnsafeCell;
-use core::ptr::{null_mut};
-use std::mem;
+use core::ptr::null_mut;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 
 /// Slab cache for OS
@@ -14,7 +14,6 @@ struct Cache<'a, T>
 {
     object_size: usize,
     slab_size: usize,
-    page_size: usize,
     object_size_type: ObjectSizeType,
     /// Total objects in slab
     objects_per_slab: usize,
@@ -31,7 +30,6 @@ impl<'a, T> Cache<'a, T>
     /// size of T must be >= 16 (two pointers)
     pub fn new(
         slab_size: usize,
-        page_size: usize,
         object_size_type: ObjectSizeType,
         memory_backend: &'a mut dyn MemoryBackend<'a, T>,
     ) -> Result<Self, ()> {
@@ -39,14 +37,13 @@ impl<'a, T> Cache<'a, T>
         if object_size < size_of::<FreeObject>() {
             return Err(());
         };
-        if !slab_size.is_power_of_two() || slab_size <= object_size || slab_size % page_size != 0 {
+        if !slab_size.is_power_of_two() || slab_size <= object_size {
             return Err(());
         }
 
         Ok(Self {
             object_size,
             slab_size,
-            page_size,
             object_size_type,
             objects_per_slab: 0,
             free_slabs_list: LinkedList::new(SlabInfoAdapter::new()),
@@ -115,16 +112,18 @@ impl<'a, T> Cache<'a, T>
             for free_object_index in 0..self.objects_per_slab {
                 // Free object stored in slab
                 let free_object_addr = slab_ptr as usize + (free_object_index * self.object_size);
-                debug_assert_ne!(free_object_addr % align_of::<FreeObject>(), 0, "FreeObject addr not aligned!");
+                debug_assert_eq!(free_object_addr % align_of::<FreeObject>(), 0, "FreeObject addr not aligned!");
                 let free_object_ptr = free_object_addr as *mut FreeObject;
+                unsafe {
+                    *free_object_ptr = FreeObject {
+                        free_object_link: LinkedListLink::new(),
+                    };
+                }
                 let free_object_ref = unsafe { &*free_object_ptr };
 
                 // Add free object to free objects list
                 slab_info_data_ref.free_objects_list.push_back(free_object_ref);
             }
-
-            // Add SlabInfo to free list
-            self.free_slabs_list.push_back(slab_info_ref);
         }
         // Allocate object
         let mut free_object_ptr: *mut T = null_mut();
@@ -284,7 +283,6 @@ mod tests {
 
         let mut slab_cache = Cache::<SomeType>::new(
             4096,
-            test_memory_backend.page_size,
             ObjectSizeType::Small,
             &mut test_memory_backend,
         )
