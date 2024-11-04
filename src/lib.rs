@@ -10,8 +10,7 @@ use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 /// Slab cache
 ///
 /// Stores objects of the type T
-struct Cache<'a, T>
-{
+struct Cache<'a, T> {
     object_size: usize,
     slab_size: usize,
     object_size_type: ObjectSizeType,
@@ -24,8 +23,7 @@ struct Cache<'a, T>
     memory_backend: &'a mut dyn MemoryBackend<'a, T>,
 }
 
-impl<'a, T> Cache<'a, T>
-{
+impl<'a, T> Cache<'a, T> {
     /// slab_size must be power of two
     /// size of T must be >= 16 (two pointers)
     pub fn new(
@@ -41,11 +39,28 @@ impl<'a, T> Cache<'a, T>
             return Err(());
         }
 
+        // Calculate number of objects in slab
+        let objects_per_slab = match object_size_type {
+            ObjectSizeType::Small => {
+                let fake_slab_addr = 0usize;
+                let fake_slab_info_addr = get_slab_info_addr_in_small_object_cache::<T>(
+                    fake_slab_addr as *mut u8,
+                    slab_size,
+                );
+                assert!(fake_slab_info_addr > fake_slab_addr);
+                assert!(
+                    fake_slab_info_addr <= fake_slab_addr + slab_size - size_of::<SlabInfo<T>>()
+                );
+                (fake_slab_info_addr - fake_slab_addr) / object_size
+            }
+            ObjectSizeType::Large => slab_size / object_size,
+        };
+
         Ok(Self {
             object_size,
             slab_size,
             object_size_type,
-            objects_per_slab: 0,
+            objects_per_slab,
             free_slabs_list: LinkedList::new(SlabInfoAdapter::new()),
             full_slabs_list: LinkedList::new(SlabInfoAdapter::new()),
             memory_backend,
@@ -65,9 +80,14 @@ impl<'a, T> Cache<'a, T>
             let slab_info_ptr = match self.object_size_type {
                 ObjectSizeType::Small => {
                     // SlabInfo stored inside slab, at end
-                    let slab_info_addr = get_slab_info_addr_in_small_object_cache::<T>(slab_ptr, self.slab_size);
+                    let slab_info_addr =
+                        get_slab_info_addr_in_small_object_cache::<T>(slab_ptr, self.slab_size);
                     debug_assert!(slab_info_addr > slab_ptr as usize);
-                    debug_assert!(slab_info_addr <= (slab_ptr as usize + self.slab_size) - size_of::<SlabInfo<T>>());
+                    debug_assert!(
+                        slab_info_addr
+                            <= slab_ptr as usize + self.slab_size - size_of::<SlabInfo<T>>()
+                    );
+
                     slab_info_addr as *mut SlabInfo<T>
                 }
                 ObjectSizeType::Large => {
@@ -81,20 +101,16 @@ impl<'a, T> Cache<'a, T>
                 self.memory_backend.free_slab(slab_ptr, self.slab_size);
                 return null_mut();
             }
-            assert_eq!(slab_info_ptr as usize % align_of::<SlabInfo<T>>(), 0, "SlabInfo addr not aligned!");
-
-            // Calculate number of objects in slab
-            self.objects_per_slab = match self.object_size_type {
-                ObjectSizeType::Small => {
-                    (slab_info_ptr as usize - slab_ptr as usize) / self.object_size
-                }
-                ObjectSizeType::Large => {
-                    (slab_ptr as usize + self.slab_size) / self.object_size
-                }
-            };
+            assert_eq!(
+                slab_info_ptr as usize % align_of::<SlabInfo<T>>(),
+                0,
+                "SlabInfo addr not aligned!"
+            );
 
             // Make SlabInfo ref
+            unsafe { slab_info_ptr.write_bytes(0, 1) };
             let slab_info_ref = unsafe { &mut *slab_info_ptr };
+            let slab_info_data_ref = unsafe { &mut *slab_info_ref.data.get() };
             // Init SlabInfo
             *slab_info_ref = SlabInfo {
                 slab_link: LinkedListLink::new(),
@@ -106,13 +122,16 @@ impl<'a, T> Cache<'a, T>
             };
             // Add SlabInfo to free list
             self.free_slabs_list.push_back(slab_info_ref);
-            let slab_info_data_ref = unsafe { &mut *slab_info_ref.data.get() };
 
             // Fill FreeObjects list
             for free_object_index in 0..self.objects_per_slab {
                 // Free object stored in slab
                 let free_object_addr = slab_ptr as usize + (free_object_index * self.object_size);
-                debug_assert_eq!(free_object_addr % align_of::<FreeObject>(), 0, "FreeObject addr not aligned!");
+                debug_assert_eq!(
+                    free_object_addr % align_of::<FreeObject>(),
+                    0,
+                    "FreeObject addr not aligned!"
+                );
                 let free_object_ptr = free_object_addr as *mut FreeObject;
                 unsafe {
                     *free_object_ptr = FreeObject {
@@ -122,7 +141,9 @@ impl<'a, T> Cache<'a, T>
                 let free_object_ref = unsafe { &*free_object_ptr };
 
                 // Add free object to free objects list
-                slab_info_data_ref.free_objects_list.push_back(free_object_ref);
+                slab_info_data_ref
+                    .free_objects_list
+                    .push_back(free_object_ref);
             }
         }
         // Allocate object
@@ -142,9 +163,11 @@ impl<'a, T> Cache<'a, T>
         if free_slab_info_data.free_objects_list.is_empty() {
             // Slab is empty now
             // Remove from free list
-            let free_slab_info = self.free_slabs_list.pop_back().unwrap();
+            let free_slab_info_addr = free_slab_info as *const _ as usize;
+            let free_slab_info1 = self.free_slabs_list.pop_back().unwrap();
+            assert_eq!(free_slab_info1 as *const _ as usize, free_slab_info_addr);
             // Add to full list
-            self.full_slabs_list.push_back(free_slab_info);
+            self.full_slabs_list.push_back(free_slab_info1);
         }
 
         free_object_ptr
@@ -244,7 +267,7 @@ trait MemoryBackend<'a, T> {
 mod tests {
     use super::*;
     extern crate alloc;
-    use alloc::alloc::{Layout, alloc, dealloc};
+    use alloc::alloc::{alloc, dealloc, Layout};
     #[test]
     fn alloc_from_small() {
         struct TestMemoryBackend {
@@ -281,12 +304,14 @@ mod tests {
             b: usize,
         }
 
-        let mut slab_cache = Cache::<SomeType>::new(
-            4096,
-            ObjectSizeType::Small,
-            &mut test_memory_backend,
-        )
-        .expect("Failed to create cache");
+        let mut slab_cache =
+            Cache::<SomeType>::new(4096, ObjectSizeType::Small, &mut test_memory_backend)
+                .expect("Failed to create cache");
+
+        for _ in 0..slab_cache.objects_per_slab - 1 {
+            let allocated_ptr = slab_cache.alloc();
+            assert!(!allocated_ptr.is_null());
+        }
         let allocated_ptr = slab_cache.alloc();
         assert!(!allocated_ptr.is_null());
         //slab_cache.free(allocated_ptr);
