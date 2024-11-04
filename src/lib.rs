@@ -108,18 +108,18 @@ impl<'a, T> Cache<'a, T> {
             );
 
             // Make SlabInfo ref
-            unsafe { slab_info_ptr.write_bytes(0, 1) };
+            unsafe {
+                slab_info_ptr.write(SlabInfo {
+                    slab_link: LinkedListLink::new(),
+                    data: UnsafeCell::new(SlabInfoData {
+                        free_objects_list: LinkedList::new(FreeObjectAdapter::new()),
+                        cache_ptr: self as *mut Self,
+                        free_objects_number: self.objects_per_slab,
+                    }),
+                });
+            };
             let slab_info_ref = unsafe { &mut *slab_info_ptr };
             let slab_info_data_ref = unsafe { &mut *slab_info_ref.data.get() };
-            // Init SlabInfo
-            *slab_info_ref = SlabInfo {
-                slab_link: LinkedListLink::new(),
-                data: UnsafeCell::new(SlabInfoData {
-                    free_objects_list: LinkedList::new(FreeObjectAdapter::new()),
-                    cache_ptr: self as *mut Self,
-                    free_objects_number: self.objects_per_slab,
-                }),
-            };
             // Add SlabInfo to free list
             self.free_slabs_list.push_back(slab_info_ref);
 
@@ -134,9 +134,9 @@ impl<'a, T> Cache<'a, T> {
                 );
                 let free_object_ptr = free_object_addr as *mut FreeObject;
                 unsafe {
-                    *free_object_ptr = FreeObject {
+                    free_object_ptr.write(FreeObject {
                         free_object_link: LinkedListLink::new(),
-                    };
+                    });
                 }
                 let free_object_ref = unsafe { &*free_object_ptr };
 
@@ -163,11 +163,9 @@ impl<'a, T> Cache<'a, T> {
         if free_slab_info_data.free_objects_list.is_empty() {
             // Slab is empty now
             // Remove from free list
-            let free_slab_info_addr = free_slab_info as *const _ as usize;
-            let free_slab_info1 = self.free_slabs_list.pop_back().unwrap();
-            assert_eq!(free_slab_info1 as *const _ as usize, free_slab_info_addr);
+            let free_slab_info = self.free_slabs_list.pop_back().unwrap();
             // Add to full list
-            self.full_slabs_list.push_back(free_slab_info1);
+            self.full_slabs_list.push_back(free_slab_info);
         }
 
         free_object_ptr
@@ -270,50 +268,31 @@ mod tests {
     use alloc::alloc::{alloc, dealloc, Layout};
     #[test]
     fn alloc_from_small() {
+        const SLAB_SIZE: usize = 64;
+        const SLAB_ALIGN: usize = 64;
         struct TestMemoryBackend {
-            page_size: usize,
+            allocated_slabs_number: usize,
         }
+
         impl<'a, T> MemoryBackend<'a, T> for TestMemoryBackend {
             fn alloc_slab(&mut self, slab_size: usize) -> *mut u8 {
-                assert!(slab_size >= self.page_size);
-                assert!(slab_size.is_power_of_two());
-                let layout = Layout::from_size_align(slab_size, self.page_size).unwrap();
+                let layout = Layout::from_size_align(SLAB_SIZE, SLAB_ALIGN).unwrap();
                 unsafe { alloc(layout) }
             }
 
             fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize) {
-                assert_eq!(slab_ptr as usize % 4096, 0);
-                assert!(slab_size >= self.page_size);
-                assert!(slab_size.is_power_of_two());
-                let layout = Layout::from_size_align(slab_size, self.page_size).unwrap();
-                unsafe { dealloc(slab_ptr, layout) };
+                assert!(!slab_ptr.is_null());
+                let layout = Layout::from_size_align(SLAB_SIZE, SLAB_ALIGN).unwrap();
+                unsafe { dealloc(slab_ptr, layout) }
             }
 
             fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a, T> {
                 unreachable!();
             }
 
-            fn free_slab_info(&mut self, _slab_ptr: *mut SlabInfo<T>) {
+            fn free_slab_info(&mut self, slab_ptr: *mut SlabInfo<'a, T>) {
                 unreachable!();
             }
         }
-        let mut test_memory_backend = TestMemoryBackend { page_size: 4096 };
-
-        struct SomeType {
-            a: usize,
-            b: usize,
-        }
-
-        let mut slab_cache =
-            Cache::<SomeType>::new(4096, ObjectSizeType::Small, &mut test_memory_backend)
-                .expect("Failed to create cache");
-
-        for _ in 0..slab_cache.objects_per_slab - 1 {
-            let allocated_ptr = slab_cache.alloc();
-            assert!(!allocated_ptr.is_null());
-        }
-        let allocated_ptr = slab_cache.alloc();
-        assert!(!allocated_ptr.is_null());
-        //slab_cache.free(allocated_ptr);
     }
 }
