@@ -261,6 +261,8 @@ trait MemoryBackend<'a, T> {
     fn free_slab_info(&mut self, slab_ptr: *mut SlabInfo<'a, T>);
 }
 
+// Tests
+
 #[cfg(test)]
 mod tests {
     use super::*;
