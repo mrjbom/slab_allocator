@@ -1,6 +1,5 @@
-#![no_std]
+//#![no_std]
 #![allow(unused)]
-extern crate alloc;
 
 use core::cell::UnsafeCell;
 use core::ptr::null_mut;
@@ -645,5 +644,24 @@ mod tests {
         // Must fail!
         let mut cache = Cache::<TestObjectType4096>::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend);
         assert!(cache.is_err());
+        drop(cache);
+
+        struct TestObjectType15 {
+            data: [u8; 15],
+        }
+        // Too small object
+        // Must fail!
+        let mut cache = Cache::<TestObjectType15>::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend);
+        assert!(cache.is_err());
+        drop(cache);
+
+        struct TestObjectType16 {
+            data: [u8; 16],
+        }
+        // Too small object
+        // Must fail!
+        let mut cache = Cache::<TestObjectType16>::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend);
+        assert!(cache.is_ok());
+        drop(cache);
     }
 }
