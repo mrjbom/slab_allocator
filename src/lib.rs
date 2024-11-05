@@ -1,11 +1,14 @@
-//#![no_std]
+#![no_std]
 #![allow(unused)]
+extern crate alloc;
 
 use core::cell::UnsafeCell;
 use core::ptr::null_mut;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 
 /// Slab cache for OS
+///
+/// For x86_64 with 4K pages buddy allocator
 
 /// Slab cache
 ///
@@ -25,18 +28,22 @@ struct Cache<'a, T> {
 
 impl<'a, T> Cache<'a, T> {
     /// slab_size must be power of two
-    /// size of T must be >= 16 (two pointers)
+    ///
+    /// size of T must be >= 8/16 (two pointers)
     pub fn new(
         slab_size: usize,
         object_size_type: ObjectSizeType,
         memory_backend: &'a mut dyn MemoryBackend<'a, T>,
-    ) -> Result<Self, ()> {
+    ) -> Result<Self, &'static str> {
         let object_size = size_of::<T>();
         if object_size < size_of::<FreeObject>() {
-            return Err(());
+            return Err("Object size smaller than 8/16 (two pointers)");
         };
-        if !slab_size.is_power_of_two() || slab_size <= object_size {
-            return Err(());
+        if slab_size <= object_size {
+            return Err("Slab must be greater than object size");
+        }
+        if !slab_size.is_power_of_two() {
+            return Err("Slab size is not power of two");
         }
 
         // Calculate number of objects in slab
@@ -240,9 +247,7 @@ intrusive_adapter!(FreeObjectAdapter<'a> = &'a FreeObject: FreeObject { free_obj
 trait MemoryBackend<'a, T> {
     /// Allocates slab for cache
     ///
-    /// slab_size always power of two and greater than page_size
-    ///
-    /// For example: page_size * 1, page_size * 2, page_size * 4, ...
+    /// slab_size always power of two
     ///
     /// Must be page aligned
     fn alloc_slab(&mut self, slab_size: usize) -> *mut u8;
@@ -267,25 +272,30 @@ trait MemoryBackend<'a, T> {
 mod tests {
     use super::*;
     extern crate alloc;
+    extern crate std;
     use alloc::alloc::{alloc, dealloc, Layout};
+    use alloc::vec::Vec;
+
     #[test]
     fn alloc_from_small() {
-        const SLAB_SIZE: usize = 64;
-        const SLAB_ALIGN: usize = 64;
+        const SLAB_SIZE: usize = 4096;
+        const SLAB_ALIGN: usize = 4096;
         struct TestMemoryBackend {
-            allocated_slabs_number: usize,
+            allocated_slabs_addrs: Vec<usize>,
         }
 
         impl<'a, T> MemoryBackend<'a, T> for TestMemoryBackend {
             fn alloc_slab(&mut self, slab_size: usize) -> *mut u8 {
+                assert!(slab_size.is_power_of_two());
                 let layout = Layout::from_size_align(SLAB_SIZE, SLAB_ALIGN).unwrap();
-                unsafe { alloc(layout) }
+                let allocated_slab_ptr = unsafe { alloc(layout) };
+                let allocated_slab_addr = allocated_slab_ptr as usize;
+                self.allocated_slabs_addrs.push(allocated_slab_addr);
+                unsafe { allocated_slab_ptr }
             }
 
             fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize) {
-                assert!(!slab_ptr.is_null());
-                let layout = Layout::from_size_align(SLAB_SIZE, SLAB_ALIGN).unwrap();
-                unsafe { dealloc(slab_ptr, layout) }
+                unreachable!();
             }
 
             fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a, T> {
@@ -294,6 +304,222 @@ mod tests {
 
             fn free_slab_info(&mut self, slab_ptr: *mut SlabInfo<'a, T>) {
                 unreachable!();
+            }
+        }
+
+        let mut test_memory_backend = TestMemoryBackend {
+            allocated_slabs_addrs: Vec::new(),
+        };
+        let test_memory_backend_ptr = &raw mut test_memory_backend;
+
+        struct TestObjectType {
+            data: [u8; 1024],
+        }
+        assert_eq!(size_of::<TestObjectType>(), 1024);
+
+        // 3 objects in slab [obj0, obj1, obj2, SlabInfo]
+        let mut cache: Cache<TestObjectType> =
+            Cache::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend)
+                .expect("Failed to create cache");
+        assert_eq!(cache.objects_per_slab, 3);
+
+        // For checks
+        let test_memory_backend_ref = unsafe { &mut *test_memory_backend_ptr };
+
+        // No slabs allocated
+        assert!(test_memory_backend_ref.allocated_slabs_addrs.is_empty());
+
+        // Allocate all objects from slab
+        // allocate obj2 from first slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(test_memory_backend_ref.allocated_slabs_addrs.len(), 1);
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[0] + size_of::<TestObjectType>() * 2
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            2
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            2
+        );
+        assert_eq!(
+            unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).cache_ptr },
+            &cache as *const _ as *mut _
+        );
+
+        // allocate obj1 from first slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[0] + size_of::<TestObjectType>() * 1
+        );
+        // 1 free objects in free slab
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            1
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            1
+        );
+
+        // allocate obj0 from first slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[0] + size_of::<TestObjectType>() * 0
+        );
+
+        // Now we have zero free slabs and one full
+        assert!(cache.free_slabs_list.is_empty());
+        assert_eq!(cache.full_slabs_list.iter().count(), 1);
+        // 0 free objects in full slab
+        assert_eq!(
+            unsafe {
+                (*cache.full_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            0
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.full_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            0
+        );
+
+        // Allocate objects again
+        // allocate obj2 from second slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[1] + size_of::<TestObjectType>() * 2
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            2
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            2
+        );
+        // New slab allocated, now we have 1 free slab and 1 full
+        assert_eq!(test_memory_backend_ref.allocated_slabs_addrs.len(), 2);
+        assert_eq!(cache.free_slabs_list.iter().count(), 1);
+        assert_eq!(cache.full_slabs_list.iter().count(), 1);
+
+        // allocate obj1 from second slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[1] + size_of::<TestObjectType>() * 1
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            1
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            1
+        );
+
+        // allocate obj0 from second slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[1] + size_of::<TestObjectType>() * 0
+        );
+        // Now we have zero free slabs and two full
+        assert_eq!(test_memory_backend_ref.allocated_slabs_addrs.len(), 2);
+        assert!(cache.free_slabs_list.is_empty());
+        assert_eq!(cache.full_slabs_list.iter().count(), 2);
+
+        // Final allocation
+        // allocate obj2 from third slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[2] + size_of::<TestObjectType>() * 2
+        );
+        // Now we have one free slab and two full
+        assert_eq!(test_memory_backend_ref.allocated_slabs_addrs.len(), 3);
+        assert_eq!(cache.free_slabs_list.iter().count(), 1);
+        assert_eq!(cache.full_slabs_list.iter().count(), 2);
+        // Free slab contains 2 free objects
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            2
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            2
+        );
+        // Full slabs don't have free objects
+        for slab_info in cache.full_slabs_list.iter() {
+            unsafe {
+                assert_eq!((*slab_info.data.get()).free_objects_number, 0);
+                assert_eq!((*slab_info.data.get()).free_objects_list.iter().count(), 0);
             }
         }
     }
