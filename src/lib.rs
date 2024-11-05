@@ -277,7 +277,7 @@ mod tests {
     use alloc::vec::Vec;
 
     #[test]
-    fn alloc_from_small() {
+    fn alloc_only_small() {
         const SLAB_SIZE: usize = 4096;
         const SLAB_ALIGN: usize = 4096;
         struct TestMemoryBackend {
@@ -340,6 +340,7 @@ mod tests {
             allocated_ptr_addr,
             test_memory_backend_ref.allocated_slabs_addrs[0] + size_of::<TestObjectType>() * 2
         );
+        // 2 free objects in slab
         assert_eq!(
             unsafe {
                 (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
@@ -359,6 +360,7 @@ mod tests {
             unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).cache_ptr },
             &cache as *const _ as *mut _
         );
+        assert!(cache.full_slabs_list.is_empty());
 
         // allocate obj1 from first slab
         let allocated_ptr = cache.alloc();
@@ -385,6 +387,7 @@ mod tests {
             },
             1
         );
+        assert!(cache.full_slabs_list.is_empty());
 
         // allocate obj0 from first slab
         let allocated_ptr = cache.alloc();
@@ -426,6 +429,7 @@ mod tests {
             allocated_ptr_addr,
             test_memory_backend_ref.allocated_slabs_addrs[1] + size_of::<TestObjectType>() * 2
         );
+        // 2 free objects in slab
         assert_eq!(
             unsafe {
                 (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
@@ -455,6 +459,7 @@ mod tests {
             allocated_ptr_addr,
             test_memory_backend_ref.allocated_slabs_addrs[1] + size_of::<TestObjectType>() * 1
         );
+        // 1 free object in slab
         assert_eq!(
             unsafe {
                 (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
