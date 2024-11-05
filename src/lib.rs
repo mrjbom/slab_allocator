@@ -587,7 +587,10 @@ mod tests {
 
         for i in 0..1048571 {
             let allocated_ptr = cache.alloc();
-            assert_eq!(allocated_ptr as usize, test_memory_backend_ref.allocated_slabs_addrs[0] + ((1048572 - i) * 16));
+            assert_eq!(
+                allocated_ptr as usize,
+                test_memory_backend_ref.allocated_slabs_addrs[0] + ((1048572 - i) * 16)
+            );
             assert!(!allocated_ptr.is_null());
             assert!(allocated_ptr.is_aligned());
         }
@@ -595,8 +598,21 @@ mod tests {
         assert!(cache.full_slabs_list.is_empty());
         assert_eq!(cache.free_slabs_list.iter().count(), 1);
         assert_eq!(test_memory_backend_ref.allocated_slabs_addrs.len(), 1);
-        assert_eq!(unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number }, 2);
-        assert_eq!(unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_list.iter().count() }, 2);
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            2
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            2
+        );
 
         // Alloc 2 free objects
         let allocated_ptr = cache.alloc();
@@ -613,7 +629,10 @@ mod tests {
 
         // Alloc one object from new slab
         let allocated_ptr = cache.alloc();
-        assert_eq!(allocated_ptr as usize, test_memory_backend_ref.allocated_slabs_addrs[1] + (1048572 * 16));
+        assert_eq!(
+            allocated_ptr as usize,
+            test_memory_backend_ref.allocated_slabs_addrs[1] + (1048572 * 16)
+        );
         assert!(!allocated_ptr.is_null());
         assert!(allocated_ptr.is_aligned());
 
@@ -622,7 +641,12 @@ mod tests {
         assert_eq!(test_memory_backend_ref.allocated_slabs_addrs.len(), 2);
         assert_eq!(cache.free_slabs_list.iter().count(), 1);
         assert_eq!(cache.full_slabs_list.iter().count(), 1);
-        assert_eq!(unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number }, 1048572);
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            1048572
+        );
     }
 
     #[test]
@@ -736,7 +760,11 @@ mod tests {
         }
         // 0 objects in slab [SlabInfo]
         // Must fail!
-        let mut cache = Cache::<TestObjectType4096>::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend);
+        let mut cache = Cache::<TestObjectType4096>::new(
+            SLAB_SIZE,
+            ObjectSizeType::Small,
+            &mut test_memory_backend,
+        );
         assert!(cache.is_err());
         drop(cache);
 
@@ -745,7 +773,11 @@ mod tests {
         }
         // Too small object
         // Must fail!
-        let mut cache = Cache::<TestObjectType15>::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend);
+        let mut cache = Cache::<TestObjectType15>::new(
+            SLAB_SIZE,
+            ObjectSizeType::Small,
+            &mut test_memory_backend,
+        );
         assert!(cache.is_err());
         drop(cache);
 
@@ -754,7 +786,11 @@ mod tests {
         }
         // Too small object
         // Must fail!
-        let mut cache = Cache::<TestObjectType16>::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend);
+        let mut cache = Cache::<TestObjectType16>::new(
+            SLAB_SIZE,
+            ObjectSizeType::Small,
+            &mut test_memory_backend,
+        );
         assert!(cache.is_ok());
         drop(cache);
     }
