@@ -41,8 +41,10 @@ impl<'a, T> Cache<'a, T> {
         if !slab_size.is_power_of_two() {
             return Err("Slab size is not power of two");
         }
-        if slab_size < size_of::<SlabInfo<T>>() + object_size {
-            return Err("Slab size is too small");
+        if let ObjectSizeType::Small = object_size_type {
+            if slab_size < size_of::<SlabInfo<T>>() + object_size {
+                return Err("Slab size is too small");
+            }
         }
 
         // Calculate number of objects in slab
