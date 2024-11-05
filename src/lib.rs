@@ -39,11 +39,11 @@ impl<'a, T> Cache<'a, T> {
         if object_size < size_of::<FreeObject>() {
             return Err("Object size smaller than 8/16 (two pointers)");
         };
-        if slab_size <= object_size {
-            return Err("Slab must be greater than object size");
-        }
         if !slab_size.is_power_of_two() {
             return Err("Slab size is not power of two");
+        }
+        if slab_size < size_of::<SlabInfo<T>>() + object_size {
+            return Err("Slab size is too small");
         }
 
         // Calculate number of objects in slab
@@ -62,6 +62,9 @@ impl<'a, T> Cache<'a, T> {
             }
             ObjectSizeType::Large => slab_size / object_size,
         };
+        if objects_per_slab == 0 {
+            return Err("No memory for any object, slab size too small");
+        }
 
         Ok(Self {
             object_size,
@@ -527,5 +530,120 @@ mod tests {
                 assert_eq!((*slab_info.data.get()).free_objects_list.iter().count(), 0);
             }
         }
+    }
+
+    #[test]
+    fn alloc_only_small_single_object() {
+        const SLAB_SIZE: usize = 4096;
+        const SLAB_ALIGN: usize = 4096;
+        struct TestMemoryBackend {
+            allocated_slabs_addrs: Vec<usize>,
+        }
+
+        impl<'a, T> MemoryBackend<'a, T> for TestMemoryBackend {
+            fn alloc_slab(&mut self, slab_size: usize) -> *mut u8 {
+                assert!(slab_size.is_power_of_two());
+                let layout = Layout::from_size_align(SLAB_SIZE, SLAB_ALIGN).unwrap();
+                let allocated_slab_ptr = unsafe { alloc(layout) };
+                let allocated_slab_addr = allocated_slab_ptr as usize;
+                self.allocated_slabs_addrs.push(allocated_slab_addr);
+                unsafe { allocated_slab_ptr }
+            }
+
+            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize) {
+                unreachable!();
+            }
+
+            fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a, T> {
+                unreachable!();
+            }
+
+            fn free_slab_info(&mut self, slab_ptr: *mut SlabInfo<'a, T>) {
+                unreachable!();
+            }
+        }
+
+        let mut test_memory_backend = TestMemoryBackend {
+            allocated_slabs_addrs: Vec::new(),
+        };
+        let test_memory_backend_ptr = &raw mut test_memory_backend;
+
+        struct TestObjectType {
+            data: [u8; 2048],
+        }
+        assert_eq!(size_of::<TestObjectType>(), 2048);
+
+        // 3 objects in slab [obj0, SlabInfo]
+        let mut cache: Cache<TestObjectType> =
+            Cache::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend)
+                .expect("Failed to create cache");
+        assert_eq!(cache.objects_per_slab, 1);
+
+        // For checks
+        let test_memory_backend_ref = unsafe { &mut *test_memory_backend_ptr };
+
+        // No slabs allocated
+        assert!(test_memory_backend_ref.allocated_slabs_addrs.is_empty());
+
+        // Allocate all objects from slab
+        // allocate obj0 from first slab
+        let allocated_ptr = cache.alloc();
+        let allocated_ptr_addr = allocated_ptr as usize;
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        assert_eq!(test_memory_backend_ref.allocated_slabs_addrs.len(), 1);
+        assert_eq!(
+            allocated_ptr_addr,
+            test_memory_backend_ref.allocated_slabs_addrs[0] + size_of::<TestObjectType>() * 0
+        );
+
+        // Now we have zero free slabs and one full
+        assert!(cache.free_slabs_list.is_empty());
+        assert_eq!(cache.full_slabs_list.iter().count(), 1);
+    }
+
+    #[test]
+    fn small_zero_objects_fail() {
+        const SLAB_SIZE: usize = 4096;
+        const SLAB_ALIGN: usize = 4096;
+        struct TestMemoryBackend {
+            allocated_slabs_addrs: Vec<usize>,
+        }
+
+        impl<'a, T> MemoryBackend<'a, T> for TestMemoryBackend {
+            fn alloc_slab(&mut self, slab_size: usize) -> *mut u8 {
+                assert!(slab_size.is_power_of_two());
+                let layout = Layout::from_size_align(SLAB_SIZE, SLAB_ALIGN).unwrap();
+                let allocated_slab_ptr = unsafe { alloc(layout) };
+                let allocated_slab_addr = allocated_slab_ptr as usize;
+                self.allocated_slabs_addrs.push(allocated_slab_addr);
+                unsafe { allocated_slab_ptr }
+            }
+
+            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize) {
+                unreachable!();
+            }
+
+            fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a, T> {
+                unreachable!();
+            }
+
+            fn free_slab_info(&mut self, slab_ptr: *mut SlabInfo<'a, T>) {
+                unreachable!();
+            }
+        }
+
+        let mut test_memory_backend = TestMemoryBackend {
+            allocated_slabs_addrs: Vec::new(),
+        };
+        let test_memory_backend_ptr = &raw mut test_memory_backend;
+
+        struct TestObjectType4096 {
+            data: [u8; 4096],
+        }
+        // 0 objects in slab [SlabInfo]
+        // Must fail!
+        let mut cache = Cache::<TestObjectType4096>::new(SLAB_SIZE, ObjectSizeType::Small, &mut test_memory_backend);
+        assert!(cache.is_err());
     }
 }
