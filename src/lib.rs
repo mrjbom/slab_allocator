@@ -695,7 +695,8 @@ mod tests {
             }
 
             fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a> {
-                let layout = Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>()).unwrap();
+                let layout =
+                    Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>()).unwrap();
                 unsafe { alloc(layout).cast() }
             }
 
@@ -731,7 +732,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 73);
 
         // Alloc 100 objects
@@ -813,7 +814,8 @@ mod tests {
             }
 
             fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a> {
-                let layout = Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>()).unwrap();
+                let layout =
+                    Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>()).unwrap();
                 unsafe { alloc(layout).cast() }
             }
 
@@ -849,7 +851,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 512);
 
         // Alloc 100 objects
