@@ -537,7 +537,7 @@ mod tests {
     // Allocations only
     // Small, slab size > page size
     // No SlabInfo allocation
-    // SlabInfo save/get
+    // SlabInfo save
     #[test]
     fn _1_alloc_only_small_ss_neq_ps() {
         const PAGE_SIZE: usize = 4096;
@@ -559,7 +559,6 @@ mod tests {
                 assert_eq!(page_size, PAGE_SIZE);
                 let layout = Layout::from_size_align(slab_size, page_size).unwrap();
                 let allocated_slab_ptr = unsafe { alloc(layout) };
-                assert!(!allocated_slab_ptr.is_null());
                 self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                 allocated_slab_ptr
             }
@@ -659,6 +658,240 @@ mod tests {
                 (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
             },
             3
+        );
+    }
+
+    // Allocations only
+    // Large, slab size == page size
+    // SlabInfo allocation
+    // SlabInfo save
+    #[test]
+    fn _2_alloc_only_large_ss_eq_ps() {
+        const PAGE_SIZE: usize = 4096;
+        const SLAB_SIZE: usize = 4096;
+        const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
+
+        struct TestObjectType56 {
+            a: [u64; 56 / 8],
+        }
+        assert_eq!(size_of::<TestObjectType56>(), 56);
+
+        struct TestMemoryBackend {
+            allocated_slab_addrs: Vec<usize>,
+        }
+
+        impl<'a> MemoryBackend<'a> for TestMemoryBackend {
+            fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                assert_eq!(slab_size, SLAB_SIZE);
+                assert_eq!(page_size, PAGE_SIZE);
+                let layout = Layout::from_size_align(slab_size, page_size).unwrap();
+                let allocated_slab_ptr = unsafe { alloc(layout) };
+                self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
+                allocated_slab_ptr
+            }
+
+            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unreachable!();
+            }
+
+            fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a> {
+                let layout = Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>()).unwrap();
+                unsafe { alloc(layout).cast() }
+            }
+
+            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+                unreachable!();
+            }
+
+            fn save_slab_info_addr(
+                &mut self,
+                slab_info_ptr: *mut SlabInfo<'a>,
+                object_page_addr: usize,
+            ) {
+                // Get function not call's in this test
+            }
+
+            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+                unreachable!();
+            }
+        }
+
+        let mut test_memory_backend = TestMemoryBackend {
+            allocated_slab_addrs: Vec::new(),
+        };
+
+        let test_memory_backend_ref = unsafe { &mut *(&raw mut test_memory_backend) };
+
+        // Create cache
+        // 73 objects
+        // [obj0, ..., obj72]
+        let mut cache: Cache<TestObjectType56> = Cache::new(
+            SLAB_SIZE,
+            PAGE_SIZE,
+            OBJECT_SIZE_TYPE,
+            &mut test_memory_backend,
+        )
+            .unwrap();
+        assert_eq!(cache.objects_per_slab, 73);
+
+        // Alloc 100 objects
+        let mut allocated_ptr = [null_mut(); 100];
+        for v in allocated_ptr.iter_mut() {
+            *v = cache.alloc();
+            assert!(!v.is_null());
+            assert!(v.is_aligned());
+        }
+        // slab0
+        // [obj72, ..., obj0] 73
+        // slab1
+        // [obj26, ..., obj0] 27
+        let mut obj_index_in_slab = cache.objects_per_slab - 1;
+        for (i, v) in allocated_ptr.iter().enumerate() {
+            let slab_index = i / cache.objects_per_slab;
+            let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index]
+                + obj_index_in_slab * cache.object_size;
+            if obj_index_in_slab == 0 {
+                obj_index_in_slab = cache.objects_per_slab - 1;
+            } else {
+                obj_index_in_slab -= 1;
+            }
+            assert_eq!(*v as usize, object_addr);
+        }
+
+        // 1 free, 1 full slabs
+        assert_eq!(cache.free_slabs_list.iter().count(), 1);
+        assert_eq!(cache.full_slabs_list.iter().count(), 1);
+        // 46 free objects
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            46
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            46
+        );
+    }
+
+    // Allocations only
+    // Large, slab size > page size
+    // SlabInfo allocation
+    // SlabInfo save
+    #[test]
+    fn _3_alloc_only_large_ss_neq_ps() {
+        const PAGE_SIZE: usize = 4096;
+        const SLAB_SIZE: usize = 8192;
+        const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
+
+        struct TestObjectType16 {
+            a: [u64; 16 / 8],
+        }
+        assert_eq!(size_of::<TestObjectType16>(), 16);
+
+        struct TestMemoryBackend {
+            allocated_slab_addrs: Vec<usize>,
+        }
+
+        impl<'a> MemoryBackend<'a> for TestMemoryBackend {
+            fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                assert_eq!(slab_size, SLAB_SIZE);
+                assert_eq!(page_size, PAGE_SIZE);
+                let layout = Layout::from_size_align(slab_size, page_size).unwrap();
+                let allocated_slab_ptr = unsafe { alloc(layout) };
+                self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
+                allocated_slab_ptr
+            }
+
+            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unreachable!();
+            }
+
+            fn alloc_slab_info(&mut self) -> *mut SlabInfo<'a> {
+                let layout = Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>()).unwrap();
+                unsafe { alloc(layout).cast() }
+            }
+
+            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+                unreachable!();
+            }
+
+            fn save_slab_info_addr(
+                &mut self,
+                slab_info_ptr: *mut SlabInfo<'a>,
+                object_page_addr: usize,
+            ) {
+                // Get function not call's in this test
+            }
+
+            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+                unreachable!();
+            }
+        }
+
+        let mut test_memory_backend = TestMemoryBackend {
+            allocated_slab_addrs: Vec::new(),
+        };
+
+        let test_memory_backend_ref = unsafe { &mut *(&raw mut test_memory_backend) };
+
+        // Create cache
+        // 512 objects
+        // [obj0, ..., obj511]
+        let mut cache: Cache<TestObjectType16> = Cache::new(
+            SLAB_SIZE,
+            PAGE_SIZE,
+            OBJECT_SIZE_TYPE,
+            &mut test_memory_backend,
+        )
+            .unwrap();
+        assert_eq!(cache.objects_per_slab, 512);
+
+        // Alloc 100 objects
+        let mut allocated_ptr = [null_mut(); 100];
+        for v in allocated_ptr.iter_mut() {
+            *v = cache.alloc();
+            assert!(!v.is_null());
+            assert!(v.is_aligned());
+        }
+        // slab0
+        // [obj99, ..., obj0] 100
+        let mut obj_index_in_slab = cache.objects_per_slab - 1;
+        for (i, v) in allocated_ptr.iter().enumerate() {
+            let slab_index = i / cache.objects_per_slab;
+            let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index]
+                + obj_index_in_slab * cache.object_size;
+            if obj_index_in_slab == 0 {
+                obj_index_in_slab = cache.objects_per_slab - 1;
+            } else {
+                obj_index_in_slab -= 1;
+            }
+            assert_eq!(*v as usize, object_addr);
+        }
+
+        // 1 free, 0 full slabs
+        assert_eq!(cache.free_slabs_list.iter().count(), 1);
+        assert_eq!(cache.full_slabs_list.iter().count(), 0);
+        // 412 free objects
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            412
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            412
         );
     }
 }
