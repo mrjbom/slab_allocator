@@ -30,14 +30,15 @@ struct Cache<'a, T> {
 }
 
 impl<'a, T> Cache<'a, T> {
-    /// slab_size must be >= page_size and must be the sum of page_size. I.e. the start and end of slab must be page-aligned.
+    /// slab_size must be >= page_size and must be the sum of page_size.<br>
+    /// I.e. the start and end of slab must be page-aligned.<br>
     ///
     /// size of T must be >= 8/16 (two pointers)
     ///
-    /// Configuration behaviors (Memory Backend requirements):
-    /// [ObjectSizeType::Small] && slab_size == page_size: Requires alloc/free slabs.
-    /// [ObjectSizeType::Small] && slab_size > page_size: Requires alloc/free slabs and save/get SlabInfo addr.
-    /// [ObjectSizeType::Large] && slab_size >= page_size: Requires alloc/free slabs, alloc/release SlabInfo and save/get SlabInfo addr.
+    /// Configuration behaviors (Memory Backend requirements):<br>
+    /// [ObjectSizeType::Small] && slab_size == page_size: Requires alloc/free slabs.<br>
+    /// [ObjectSizeType::Small] && slab_size > page_size: Requires alloc/free slabs and save/get SlabInfo addr.<br>
+    /// [ObjectSizeType::Large] && slab_size >= page_size: Requires alloc/free slabs, alloc/release SlabInfo and save/get SlabInfo addr.<br>
     pub fn new(
         slab_size: usize,
         page_size: usize,
@@ -299,18 +300,18 @@ fn align_down(addr: usize, align: usize) -> usize {
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// See [ObjectSizeType::Small] and [ObjectSizeType::Large]
 enum ObjectSizeType {
-    /// For small size objects, SlabInfo is stored directly in slab and little memory is lost.
-    /// For example:
-    /// slab size: 4096
-    /// object size: 32
-    /// slab info: 40
+    /// For small size objects, SlabInfo is stored directly in slab and little memory is lost.<br>
+    /// For example:<br>
+    /// slab size: 4096<br>
+    /// object size: 32<br>
+    /// slab info: 40<br>
     /// We will be able to place 126 objects, this will consume 4032 bytes, the 40 bytes will be occupied by SlabInfo, only 24 bytes will be lost, all is well.
     Small,
-    /// For large size objects, SlabInfo can't be stored directly in slab and allocates using MemoryBackend.
-    /// For example:
-    /// slab size: 4096
-    /// object size: 2048
-    /// slab info: 40
+    /// For large size objects, SlabInfo can't be stored directly in slab and allocates using MemoryBackend.<br>
+    /// For example:<br>
+    /// slab size: 4096<br>
+    /// object size: 2048<br>
+    /// slab info: 40<br>
     /// We will be able to place only 1 objects, this will consume 2048 bytes, the 40 bytes will be occupied by SlabInfo, 2008 bytes will be lost!
     Large,
 }
@@ -373,26 +374,26 @@ trait MemoryBackend<'a> {
 
     /// It is required to save slab_info_addr to the corresponding ***down page aligned*** object_ptr (page addr)
     ///
-    /// This function cannot be called just for the cache which: [ObjectSizeType::Small] and slab_size == page_size.
+    /// This function cannot be called just for the cache which: [ObjectSizeType::Small] and slab_size == page_size.<br>
     /// In this case the allocator is able to calculate its address itself.
     ///
-    /// How it works: when an object is returned to the cache, SlabInfo needs to be found.
-    /// SlabInfo can be stored in the slab itself([ObjectSizeType::Small]) or outside of it([ObjectSizeType::Large]).
-    /// In the case of Large it is impossible to calculate this address exactly, in the case of Small it is impossible to calculate this address because the start of the slab is unknown.
+    /// How it works: when an object is returned to the cache, SlabInfo needs to be found.<br>
+    /// SlabInfo can be stored in the slab itself([ObjectSizeType::Small]) or outside of it([ObjectSizeType::Large]).<br>
+    /// In the case of Large it is impossible to calculate this address exactly, in the case of Small it is impossible to calculate this address because the start of the slab is unknown.<br>
     /// Only when slab_size == page_size, we know for sure that the slab starts at the beginning of the page.
     ///
     ///
     /// # IMPORTANT
-    /// * Since the beginning of slab is aligned to the beginning of a page, and slab exactly in pages you can save slab_info_ptr to the page address of the page to which the object belongs.
+    /// * Since the beginning of slab is aligned to the beginning of a page, and slab exactly in pages you can save slab_info_ptr to the page address of the page to which the object belongs.<br>
     /// Hash table good for this
     /// ```ignore
     /// // key value
     /// hashtable.insert(object_page_addr, slab_info_ptr);
     /// ```
     ///
-    ///  |   SLAB0   | <-- 1 slabs, 1 slab info
-    ///  |o0;o1|o2;o3| <-- 2 pages (2 pages in slab)
-    /// If you align the address of the object to the page, you can unambiguously refer it to the correct slab (slab page) and calculate SlabInfo by the slab page as well.
+    ///  |   SLAB0   | <-- 1 slabs, 1 slab info<br>
+    ///  |o0;o1|o2;o3| <-- 2 pages (2 pages in slab)<br>
+    /// If you align the address of the object to the page, you can unambiguously refer it to the correct slab (slab page) and calculate SlabInfo by the slab page as well.<br>
     /// Not only is it incredibly wasteful to save SlabInfo for each object, but it doesn't make sense. But this trick works only when the beginning of the slab is aligned to the beginning of the page and when its size is the sum of page sizes.
     fn save_slab_info_addr(&mut self, slab_info_ptr: *mut SlabInfo<'a>, object_page_addr: usize);
 
