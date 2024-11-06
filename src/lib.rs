@@ -26,7 +26,7 @@ struct Cache<'a, T> {
     full_slabs_list: LinkedList<SlabInfoAdapter<'a>>,
     memory_backend: &'a mut dyn MemoryBackend<'a>,
 
-    phantom_data: core::marker::PhantomData<T>
+    phantom_data: core::marker::PhantomData<T>,
 }
 
 impl<'a, T> Cache<'a, T> {
@@ -63,9 +63,7 @@ impl<'a, T> Cache<'a, T> {
                     slab_size,
                 );
                 assert!(fake_slab_info_addr > fake_slab_addr);
-                assert!(
-                    fake_slab_info_addr <= fake_slab_addr + slab_size - size_of::<SlabInfo>()
-                );
+                assert!(fake_slab_info_addr <= fake_slab_addr + slab_size - size_of::<SlabInfo>());
                 (fake_slab_info_addr - fake_slab_addr) / object_size
             }
             ObjectSizeType::Large => slab_size / object_size,
@@ -218,18 +216,21 @@ impl<'a, T> Cache<'a, T> {
             if self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size {
                 // In this case we may calculate slab info addr
                 let slab_addr = align_down(object_ptr as usize, self.page_size);
-                let slab_info_addr = calculate_slab_info_addr_in_small_object_cache::<T>(slab_addr as *mut u8, self.slab_size);
+                let slab_info_addr = calculate_slab_info_addr_in_small_object_cache::<T>(
+                    slab_addr as *mut u8,
+                    self.slab_size,
+                );
                 debug_assert!(slab_addr != 0);
                 debug_assert!(slab_info_addr != 0);
                 debug_assert!(slab_info_addr > slab_addr);
-                debug_assert!(
-                    slab_info_addr <= slab_addr + self.slab_size - size_of::<SlabInfo>()
-                );
+                debug_assert!(slab_info_addr <= slab_addr + self.slab_size - size_of::<SlabInfo>());
                 debug_assert_eq!(slab_info_addr % size_of::<SlabInfo>(), 0);
                 (slab_addr, slab_info_addr)
             } else {
                 // Get slab info addr from memory backend
-                let slab_info_ptr = self.memory_backend.get_slab_info_addr((object_ptr as usize));
+                let slab_info_ptr = self
+                    .memory_backend
+                    .get_slab_info_addr((object_ptr as usize));
                 debug_assert!(!slab_info_ptr.is_null());
                 debug_assert!(slab_info_ptr.is_aligned());
                 let slab_ptr = unsafe { (*(*slab_info_ptr).data.get()).slab_ptr };
@@ -237,7 +238,7 @@ impl<'a, T> Cache<'a, T> {
                 (slab_ptr as usize, slab_info_ptr as usize)
             }
         };
-        let free_object_ref =  unsafe { &*(object_ptr as *mut FreeObject) };
+        let free_object_ref = unsafe { &*(object_ptr as *mut FreeObject) };
         let slab_info_ptr = slab_info_addr as *mut SlabInfo;
         let slab_info_ref = unsafe { &mut *slab_info_ptr };
 
@@ -247,19 +248,26 @@ impl<'a, T> Cache<'a, T> {
         assert_ne!(slab_info_ref.data.get_mut().free_objects_number, self.objects_per_slab, "Attempting to free an unallocated object! There are no allocated objects in this slab.");
 
         // Add object to free list
-        slab_info_ref.data.get_mut().free_objects_list.push_back(free_object_ref);
+        slab_info_ref
+            .data
+            .get_mut()
+            .free_objects_list
+            .push_back(free_object_ref);
         slab_info_ref.data.get_mut().free_objects_number += 1;
 
         // Check free list
         if slab_info_ref.data.get_mut().free_objects_number == self.objects_per_slab {
             // All objects in slab free - free slab
             // Remove SlabInfo from free list
-            let mut slab_info_cursor = unsafe { self.free_slabs_list.cursor_mut_from_ptr(slab_info_ptr) };
+            let mut slab_info_cursor =
+                unsafe { self.free_slabs_list.cursor_mut_from_ptr(slab_info_ptr) };
             debug_assert!(slab_info_cursor.remove().is_some());
             // Free slab
-            self.memory_backend.free_slab(slab_addr as *mut u8, self.slab_size, self.page_size);
+            self.memory_backend
+                .free_slab(slab_addr as *mut u8, self.slab_size, self.page_size);
 
-            if !(self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size) {
+            if !(self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size)
+            {
                 if self.object_size_type == ObjectSizeType::Large {
                     // Free SlabInfo
                     self.memory_backend.free_slab_info(slab_info_ptr);
@@ -383,11 +391,7 @@ trait MemoryBackend<'a> {
     ///  |o0;o1|o2;o3| <-- 2 pages (2 pages in slab)
     /// If you align the address of the object to the page, you can unambiguously refer it to the correct slab (slab page) and calculate SlabInfo by the slab page as well.
     /// Not only is it incredibly wasteful to save SlabInfo for each object, but it doesn't make sense. But this trick works only when the beginning of the slab is aligned to the beginning of the page and when its size is the sum of page sizes.
-    fn save_slab_info_addr(
-        &mut self,
-        slab_info_ptr: *mut SlabInfo<'a>,
-        object_page_addr: usize,
-    );
+    fn save_slab_info_addr(&mut self, slab_info_ptr: *mut SlabInfo<'a>, object_page_addr: usize);
 
     /// It is required to get slab_info_addr the corresponding ***down page aligned*** object_ptr (page addr)
     fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a>;
@@ -446,7 +450,11 @@ mod tests {
                 unreachable!();
             }
 
-            fn save_slab_info_addr(&mut self, slab_info_ptr: *mut SlabInfo, object_page_addr: usize) {
+            fn save_slab_info_addr(
+                &mut self,
+                slab_info_ptr: *mut SlabInfo,
+                object_page_addr: usize,
+            ) {
                 unreachable!();
             }
 
@@ -464,7 +472,13 @@ mod tests {
         // Create cache
         // 3 objects
         // [obj0, obj1, obj2]
-        let mut cache: Cache<TestObjectType1024> = Cache::new(SLAB_SIZE, PAGE_SIZE, OBJECT_SIZE_TYPE, &mut test_memory_backend).unwrap();
+        let mut cache: Cache<TestObjectType1024> = Cache::new(
+            SLAB_SIZE,
+            PAGE_SIZE,
+            OBJECT_SIZE_TYPE,
+            &mut test_memory_backend,
+        )
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 3);
 
         // Alloc 7 objects
@@ -482,7 +496,8 @@ mod tests {
             let slab_index = i / cache.objects_per_slab;
             // 0 1 2 3 4 5 6
             // 2 1 0 2 1 0 2
-            let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index] + obj_index_in_slab * cache.object_size;
+            let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index]
+                + obj_index_in_slab * cache.object_size;
             if obj_index_in_slab == 0 {
                 obj_index_in_slab = cache.objects_per_slab - 1;
             } else {
@@ -495,8 +510,21 @@ mod tests {
         assert_eq!(cache.free_slabs_list.iter().count(), 1);
         assert_eq!(cache.full_slabs_list.iter().count(), 2);
         // 2 free objects
-        assert_eq!(unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_list.iter().count() }, 2);
-        assert_eq!(unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number }, 2);
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            2
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            2
+        );
 
         // Alloc 2
         assert!(!cache.alloc().is_null());
@@ -548,7 +576,11 @@ mod tests {
                 unreachable!();
             }
 
-            fn save_slab_info_addr(&mut self, slab_info_ptr: *mut SlabInfo<'a>, object_page_addr: usize) {
+            fn save_slab_info_addr(
+                &mut self,
+                slab_info_ptr: *mut SlabInfo<'a>,
+                object_page_addr: usize,
+            ) {
                 // Get function not call's in this test
             }
 
@@ -566,7 +598,13 @@ mod tests {
         // Create cache
         // 7 objects
         // [obj0, obj1, obj2, obj3, obj4, obj5, obj6]
-        let mut cache: Cache<TestObjectType1024> = Cache::new(SLAB_SIZE, PAGE_SIZE, OBJECT_SIZE_TYPE, &mut test_memory_backend).unwrap();
+        let mut cache: Cache<TestObjectType1024> = Cache::new(
+            SLAB_SIZE,
+            PAGE_SIZE,
+            OBJECT_SIZE_TYPE,
+            &mut test_memory_backend,
+        )
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 7);
 
         // Alloc 25 objects
@@ -593,7 +631,8 @@ mod tests {
             let slab_index = i / cache.objects_per_slab;
             // 0 1 2 3 4 5 6
             // 2 1 0 2 1 0 2
-            let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index] + obj_index_in_slab * cache.object_size;
+            let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index]
+                + obj_index_in_slab * cache.object_size;
             if obj_index_in_slab == 0 {
                 obj_index_in_slab = cache.objects_per_slab - 1;
             } else {
@@ -606,7 +645,20 @@ mod tests {
         assert_eq!(cache.free_slabs_list.iter().count(), 1);
         assert_eq!(cache.full_slabs_list.iter().count(), 3);
         // 3 free objects
-        assert_eq!(unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_list.iter().count() }, 3);
-        assert_eq!(unsafe { (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number }, 3);
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get())
+                    .free_objects_list
+                    .iter()
+                    .count()
+            },
+            3
+        );
+        assert_eq!(
+            unsafe {
+                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number
+            },
+            3
+        );
     }
 }
