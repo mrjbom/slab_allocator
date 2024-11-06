@@ -32,9 +32,12 @@ struct Cache<'a, T> {
 impl<'a, T> Cache<'a, T> {
     /// slab_size must be >= page_size and must be the sum of page_size. I.e. the start and end of slab must be page-aligned.
     ///
-    /// memory_backend
-    ///
     /// size of T must be >= 8/16 (two pointers)
+    ///
+    /// Configuration behaviors (Memory Backend requirements):
+    /// [ObjectSizeType::Small] && slab_size == page_size: Requires alloc/free slabs.
+    /// [ObjectSizeType::Small] && slab_size > page_size: Requires alloc/free slabs and save/get SlabInfo addr.
+    /// [ObjectSizeType::Large] && slab_size >= page_size: Requires alloc/free slabs, alloc/release SlabInfo and save/get SlabInfo addr.
     pub fn new(
         slab_size: usize,
         page_size: usize,
@@ -344,11 +347,11 @@ struct FreeObject {
 intrusive_adapter!(SlabInfoAdapter<'a> = &'a SlabInfo<'a>: SlabInfo { slab_link: LinkedListLink });
 intrusive_adapter!(FreeObjectAdapter<'a> = &'a FreeObject: FreeObject { free_object_link: LinkedListLink });
 
-/// Used by slab cache for allocating slabs and SlabInfo's
+/// Used by slab cache for allocating slabs, SlabInfo's, saving/geting SlabInfo addrs
 ///
 /// Slab caching logic can be placed here
 ///
-/// alloc_slab_info() and free_slab_info() not used by small objects cache and can always return null
+/// See [Cache::new()] for memory backend requirements
 trait MemoryBackend<'a> {
     /// Allocates slab for cache
     ///
