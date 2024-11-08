@@ -1175,27 +1175,20 @@ mod tests {
                 assert_eq!(object_page_addr % PAGE_SIZE, 0);
                 self.ht_saved_slab_infos
                     .insert(object_page_addr, slab_info_ptr);
-                print!("save: for {object_page_addr:x} {slab_info_ptr:x?} ");
                 if let Some(counter) = self.ht_save_get_calls_counter.get_mut(&slab_info_ptr) {
                     *counter += 1;
                 } else {
                     self.ht_save_get_calls_counter.insert(slab_info_ptr, 1);
                 }
-                println!(
-                    "{}",
-                    self.ht_save_get_calls_counter.get(&slab_info_ptr).unwrap()
-                );
             }
 
             fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
                 let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
-                print!("get: for {object_page_addr:x} {slab_info_ptr:x?} ");
                 let counter = self
                     .ht_save_get_calls_counter
                     .get_mut(&slab_info_ptr)
                     .unwrap();
                 *counter -= 1;
-                println!("{counter}");
                 slab_info_ptr
             }
         }
