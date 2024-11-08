@@ -118,20 +118,20 @@ impl<'a, T> Cache<'a, T> {
                 }
                 ObjectSizeType::Large => {
                     // Allocate memory using memory backend
-                    self.memory_backend.alloc_slab_info()
+                    let slab_info_ptr = self.memory_backend.alloc_slab_info();
+                    assert!(slab_info_ptr.is_aligned(), "Memory backend allocates not aligned SlabInfo");
+                    if slab_info_ptr.is_null() {
+                        // Failed to allocate SlabInfo
+                        // Free slab
+                        self.memory_backend
+                            .free_slab(slab_ptr, self.slab_size, self.page_size);
+                        return null_mut();
+                    }
+                    slab_info_ptr
                 }
             };
-            if slab_info_ptr.is_null() {
-                // Failed to allocate SlabInfo
-                self.memory_backend
-                    .free_slab(slab_ptr, self.slab_size, self.page_size);
-                return null_mut();
-            }
-            assert_eq!(
-                slab_info_ptr as usize % align_of::<SlabInfo>(),
-                0,
-                "SlabInfo addr not aligned!"
-            );
+            assert!(!slab_info_ptr.is_null());
+            assert!(slab_info_ptr.is_aligned());
 
             // Fill SlabInfo
             unsafe {
@@ -508,8 +508,8 @@ mod tests {
         assert_eq!(cache.objects_per_slab, 3);
 
         // Alloc 7 objects
-        let mut allocated_ptr = [null_mut(); 7];
-        for v in allocated_ptr.iter_mut() {
+        let mut allocated_ptrs = [null_mut(); 7];
+        for v in allocated_ptrs.iter_mut() {
             *v = cache.alloc();
             assert!(!v.is_null());
             assert!(v.is_aligned());
@@ -517,7 +517,7 @@ mod tests {
         // slab 0            slab 1            slab2
         // [obj2, obj1, obj0][obj2, obj1, obj0][obj2]
         let mut obj_index_in_slab = cache.objects_per_slab - 1;
-        for (i, v) in allocated_ptr.iter().enumerate() {
+        for (i, v) in allocated_ptrs.iter().enumerate() {
             // 0 0 0 1 1 1 2
             let slab_index = i / cache.objects_per_slab;
             // 0 1 2 3 4 5 6
@@ -633,8 +633,8 @@ mod tests {
         assert_eq!(cache.objects_per_slab, 7);
 
         // Alloc 25 objects
-        let mut allocated_ptr = [null_mut(); 25];
-        for v in allocated_ptr.iter_mut() {
+        let mut allocated_ptrs = [null_mut(); 25];
+        for v in allocated_ptrs.iter_mut() {
             *v = cache.alloc();
             assert!(!v.is_null());
             assert!(v.is_aligned());
@@ -648,7 +648,7 @@ mod tests {
         // slab3
         // [obj6, obj5, obj4, obj3]
         let mut obj_index_in_slab = cache.objects_per_slab - 1;
-        for (i, v) in allocated_ptr.iter().enumerate() {
+        for (i, v) in allocated_ptrs.iter().enumerate() {
             // 0 0 0 0 0 0 0
             // 1 1 1 1 1 1 1
             // 2 2 2 2 2 2 2
@@ -762,8 +762,8 @@ mod tests {
         assert_eq!(cache.objects_per_slab, 73);
 
         // Alloc 100 objects
-        let mut allocated_ptr = [null_mut(); 100];
-        for v in allocated_ptr.iter_mut() {
+        let mut allocated_ptrs = [null_mut(); 100];
+        for v in allocated_ptrs.iter_mut() {
             *v = cache.alloc();
             assert!(!v.is_null());
             assert!(v.is_aligned());
@@ -773,7 +773,7 @@ mod tests {
         // slab1
         // [obj26, ..., obj0] 27
         let mut obj_index_in_slab = cache.objects_per_slab - 1;
-        for (i, v) in allocated_ptr.iter().enumerate() {
+        for (i, v) in allocated_ptrs.iter().enumerate() {
             let slab_index = i / cache.objects_per_slab;
             let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index]
                 + obj_index_in_slab * cache.object_size;
@@ -881,8 +881,8 @@ mod tests {
         assert_eq!(cache.objects_per_slab, 512);
 
         // Alloc 100 objects
-        let mut allocated_ptr = [null_mut(); 100];
-        for v in allocated_ptr.iter_mut() {
+        let mut allocated_ptrs = [null_mut(); 100];
+        for v in allocated_ptrs.iter_mut() {
             *v = cache.alloc();
             assert!(!v.is_null());
             assert!(v.is_aligned());
@@ -890,7 +890,7 @@ mod tests {
         // slab0
         // [obj99, ..., obj0] 100
         let mut obj_index_in_slab = cache.objects_per_slab - 1;
-        for (i, v) in allocated_ptr.iter().enumerate() {
+        for (i, v) in allocated_ptrs.iter().enumerate() {
             let slab_index = i / cache.objects_per_slab;
             let object_addr = test_memory_backend_ref.allocated_slab_addrs[slab_index]
                 + obj_index_in_slab * cache.object_size;
@@ -1004,6 +1004,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cache.objects_per_slab, 7);
+
+        // Alloc 1
+        let allocated_ptr = cache.alloc();
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        // Free 1
+        cache.free(allocated_ptr);
+        assert!(cache.free_slabs_list.is_empty());
+        assert!(test_memory_backend_ref.allocated_slab_addrs.is_empty());
 
         // Alloc first slab particaly
         let mut first_slab_ptrs = vec![null_mut(); cache.objects_per_slab - 1];
@@ -1195,6 +1204,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cache.objects_per_slab, 15);
+
+        // Alloc 1
+        let allocated_ptr = cache.alloc();
+        assert!(!allocated_ptr.is_null());
+        assert!(allocated_ptr.is_aligned());
+        // Free 1
+        cache.free(allocated_ptr);
+        assert!(cache.free_slabs_list.is_empty());
+        assert!(test_memory_backend_ref.allocated_slab_addrs.is_empty());
 
         // Alloc first slab particaly
         let mut first_slab_ptrs = vec![null_mut(); cache.objects_per_slab - 1];
