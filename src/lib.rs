@@ -119,7 +119,10 @@ impl<'a, T> Cache<'a, T> {
                 ObjectSizeType::Large => {
                     // Allocate memory using memory backend
                     let slab_info_ptr = self.memory_backend.alloc_slab_info();
-                    assert!(slab_info_ptr.is_aligned(), "Memory backend allocates not aligned SlabInfo");
+                    assert!(
+                        slab_info_ptr.is_aligned(),
+                        "Memory backend allocates not aligned SlabInfo"
+                    );
                     if slab_info_ptr.is_null() {
                         // Failed to allocate SlabInfo
                         // Free slab
