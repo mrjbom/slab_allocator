@@ -507,7 +507,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 3);
 
         // Alloc 7 objects
@@ -635,7 +635,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 7);
 
         // Alloc 25 objects
@@ -767,7 +767,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 73);
 
         // Alloc 100 objects
@@ -889,7 +889,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 512);
 
         // Alloc 100 objects
@@ -1014,7 +1014,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 7);
 
         // Alloc 1
@@ -1130,7 +1130,7 @@ mod tests {
             allocated_slab_addrs: Vec<usize>,
             ht_saved_slab_infos: HashMap<usize, *mut SlabInfo<'a>>,
             // Counts save/get calls
-            ht_save_get_calls_counter: HashMap<(usize, *mut SlabInfo<'a>), usize>,
+            ht_save_get_calls_counter: HashMap<*mut SlabInfo<'a>, usize>,
         }
 
         impl<'a> MemoryBackend<'a> for TestMemoryBackend<'a> {
@@ -1173,30 +1173,25 @@ mod tests {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
                 assert_eq!(object_page_addr % PAGE_SIZE, 0);
-                let is_first_call = self
-                    .ht_saved_slab_infos
-                    .insert(object_page_addr, slab_info_ptr)
-                    .is_none();
-                let counter = if is_first_call {
-                    1usize
+                self.ht_saved_slab_infos.insert(object_page_addr, slab_info_ptr);
+                print!("save: for {object_page_addr:x} {slab_info_ptr:x?} ");
+                if let Some(counter) = self.ht_save_get_calls_counter.get_mut(&slab_info_ptr) {
+                    *counter += 1;
                 } else {
-                    *self
-                        .ht_save_get_calls_counter
-                        .get(&(object_page_addr, slab_info_ptr))
-                        .unwrap()
-                        + 1
-                };
-                self.ht_save_get_calls_counter
-                    .insert((object_page_addr, slab_info_ptr), counter);
+                    self.ht_save_get_calls_counter.insert(slab_info_ptr, 1);
+                }
+                println!("{}", self.ht_save_get_calls_counter.get(&slab_info_ptr).unwrap());
             }
 
             fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
                 let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
+                print!("get: for {object_page_addr:x} {slab_info_ptr:x?} ");
                 let counter = self
                     .ht_save_get_calls_counter
-                    .get_mut(&(object_page_addr, slab_info_ptr))
+                    .get_mut(&slab_info_ptr)
                     .unwrap();
                 *counter -= 1;
+                println!("{counter}");
                 slab_info_ptr
             }
         }
@@ -1217,7 +1212,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 15);
 
         // Alloc 1
@@ -1430,7 +1425,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 8);
 
         // Alloc 1
@@ -1638,7 +1633,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(cache.objects_per_slab, 32);
 
         // Alloc 1
