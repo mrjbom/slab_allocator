@@ -507,7 +507,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 3);
 
         // Alloc 7 objects
@@ -635,7 +635,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 7);
 
         // Alloc 25 objects
@@ -767,7 +767,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 73);
 
         // Alloc 100 objects
@@ -889,7 +889,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 512);
 
         // Alloc 100 objects
@@ -1014,7 +1014,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 7);
 
         // Alloc 1
@@ -1173,14 +1173,18 @@ mod tests {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
                 assert_eq!(object_page_addr % PAGE_SIZE, 0);
-                self.ht_saved_slab_infos.insert(object_page_addr, slab_info_ptr);
+                self.ht_saved_slab_infos
+                    .insert(object_page_addr, slab_info_ptr);
                 print!("save: for {object_page_addr:x} {slab_info_ptr:x?} ");
                 if let Some(counter) = self.ht_save_get_calls_counter.get_mut(&slab_info_ptr) {
                     *counter += 1;
                 } else {
                     self.ht_save_get_calls_counter.insert(slab_info_ptr, 1);
                 }
-                println!("{}", self.ht_save_get_calls_counter.get(&slab_info_ptr).unwrap());
+                println!(
+                    "{}",
+                    self.ht_save_get_calls_counter.get(&slab_info_ptr).unwrap()
+                );
             }
 
             fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
@@ -1212,7 +1216,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 15);
 
         // Alloc 1
@@ -1425,7 +1429,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 8);
 
         // Alloc 1
@@ -1633,7 +1637,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 32);
 
         // Alloc 1
