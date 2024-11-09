@@ -207,7 +207,7 @@ impl<'a, T> Cache<'a, T> {
 
             if !dont_save {
                 self.memory_backend
-                    .save_slab_info_addr(free_slab_info_ptr, free_object_page_addr);
+                    .save_slab_info_addr(free_object_page_addr, free_slab_info_ptr);
             }
         }
 
@@ -422,7 +422,7 @@ trait MemoryBackend<'a> {
     ///  |o0;o1|o2;o3| <-- 2 pages (2 pages in slab)<br>
     /// If you align the address of the object to the page, you can unambiguously refer it to the correct slab (slab page) and calculate SlabInfo by the slab page as well.<br>
     /// Not only is it incredibly wasteful to save SlabInfo for each object, but it doesn't make sense. But this trick works only when the beginning of the slab is aligned to the beginning of the page and when its size is the sum of page sizes.
-    fn save_slab_info_addr(&mut self, slab_info_ptr: *mut SlabInfo<'a>, object_page_addr: usize);
+    fn save_slab_info_addr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo<'a>);
 
     /// It is required to get slab_info_addr the corresponding ***down page aligned*** object_ptr (page addr)
     fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a>;
@@ -485,8 +485,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 unreachable!();
             }
@@ -610,8 +610,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
@@ -742,8 +742,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
@@ -864,8 +864,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
@@ -993,8 +993,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 unreachable!();
             }
@@ -1213,8 +1213,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
@@ -1478,8 +1478,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
@@ -1729,8 +1729,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
@@ -1954,8 +1954,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 unreachable!();
             }
@@ -2092,8 +2092,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 self.ht_saved_slab_infos
                     .insert(object_page_addr, slab_info_ptr);
@@ -2241,8 +2241,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 self.ht_saved_slab_infos
                     .insert(object_page_addr, slab_info_ptr);
@@ -2392,8 +2392,8 @@ mod tests {
 
             fn save_slab_info_addr(
                 &mut self,
-                slab_info_ptr: *mut SlabInfo<'a>,
                 object_page_addr: usize,
+                slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 self.ht_saved_slab_infos
                     .insert(object_page_addr, slab_info_ptr);
