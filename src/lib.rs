@@ -944,6 +944,7 @@ mod tests {
     // Small, slab size == page size
     // No SlabInfo allocation/free
     // No SlabInfo save/get
+    // With random test
     fn _04_free_small_ss_eq_ps() {
         const PAGE_SIZE: usize = 4096;
         const SLAB_SIZE: usize = 4096;
@@ -1111,7 +1112,47 @@ mod tests {
         // 0 free slabs, 0 full slabs
         assert_eq!(cache.free_slabs_list.iter().count(), 0);
         assert_eq!(cache.full_slabs_list.iter().count(), 0);
+        assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
 
+        // RANDOM
+
+        // Random number of test
+        for _ in 0..rand::thread_rng().gen_range(100..=200) {
+            let mut allocated_ptrs = Vec::new();
+
+            for _ in 10..=20 {
+                // Alloc or free
+                if rand::thread_rng().gen_bool(0.5) {
+                    // Alloc random number of objects/slabs
+                    for _ in 0..rand::thread_rng().gen_range(20..100) {
+                        let allocated_ptr = cache.alloc();
+                        assert!(!allocated_ptr.is_null());
+                        assert!(allocated_ptr.is_aligned());
+                        allocated_ptrs.push(allocated_ptr);
+                    }
+                } else {
+                    allocated_ptrs.shuffle(&mut rand::thread_rng());
+                    // Free random number of objects/slabs
+                    for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
+                        cache.free(allocated_ptrs.pop().unwrap());
+                    }
+                }
+            }
+
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
+
+            // Free all objects
+            allocated_ptrs.shuffle(&mut rand::thread_rng());
+            for v in allocated_ptrs.into_iter() {
+                cache.free(v);
+            }
+            assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
+        }
+
+        assert!(cache.free_slabs_list.is_empty());
+        assert!(cache.full_slabs_list.is_empty());
         assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
     }
 
@@ -1119,6 +1160,7 @@ mod tests {
     // Small, slab size > page size
     // No SlabInfo allocation/free
     // SlabInfo save/get
+    // With random test
     #[test]
     fn _05_free_small_ss_neq_ps() {
         const PAGE_SIZE: usize = 4096;
@@ -1315,12 +1357,54 @@ mod tests {
             .ht_save_get_calls_counter
             .iter()
             .all(|v| *v.1 == 0));
+
+        // Random test
+
+        // Random number of test
+        for _ in 0..rand::thread_rng().gen_range(100..=200) {
+            let mut allocated_ptrs = Vec::new();
+
+            for _ in 10..=20 {
+                // Alloc or free
+                if rand::thread_rng().gen_bool(0.5) {
+                    // Alloc random number of objects/slabs
+                    for _ in 0..rand::thread_rng().gen_range(20..100) {
+                        let allocated_ptr = cache.alloc();
+                        assert!(!allocated_ptr.is_null());
+                        assert!(allocated_ptr.is_aligned());
+                        allocated_ptrs.push(allocated_ptr);
+                    }
+                } else {
+                    allocated_ptrs.shuffle(&mut rand::thread_rng());
+                    // Free random number of objects/slabs
+                    for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
+                        cache.free(allocated_ptrs.pop().unwrap());
+                    }
+                }
+            }
+
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
+
+            // Free all objects
+            allocated_ptrs.shuffle(&mut rand::thread_rng());
+            for v in allocated_ptrs.into_iter() {
+                cache.free(v);
+            }
+            assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
+        }
+
+        assert!(cache.free_slabs_list.is_empty());
+        assert!(cache.full_slabs_list.is_empty());
+        assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
     }
 
     // Alloc and free
     // Large, slab size == page size
     // SlabInfo allocation/free
     // SlabInfo save/get
+    // With random test
     #[test]
     fn _06_free_large_ss_eq_ps() {
         const PAGE_SIZE: usize = 4096;
@@ -1523,12 +1607,56 @@ mod tests {
 
         assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
         assert_eq!(test_memory_backend_ref.allocated_slab_info_addrs.len(), 0);
+
+        // Random test
+
+        // Random number of test
+        for _ in 0..rand::thread_rng().gen_range(100..=200) {
+            let mut allocated_ptrs = Vec::new();
+
+            for _ in 10..=20 {
+                // Alloc or free
+                if rand::thread_rng().gen_bool(0.5) {
+                    // Alloc random number of objects/slabs
+                    for _ in 0..rand::thread_rng().gen_range(20..100) {
+                        let allocated_ptr = cache.alloc();
+                        assert!(!allocated_ptr.is_null());
+                        assert!(allocated_ptr.is_aligned());
+                        allocated_ptrs.push(allocated_ptr);
+                    }
+                } else {
+                    allocated_ptrs.shuffle(&mut rand::thread_rng());
+                    // Free random number of objects
+                    for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
+                        cache.free(allocated_ptrs.pop().unwrap());
+                    }
+                }
+            }
+
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
+
+            // Free all objects
+            allocated_ptrs.shuffle(&mut rand::thread_rng());
+            for v in allocated_ptrs.into_iter() {
+                cache.free(v);
+            }
+            assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
+        }
+
+        assert!(cache.free_slabs_list.is_empty());
+        assert!(cache.full_slabs_list.is_empty());
+        assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
+        assert_eq!(test_memory_backend_ref.allocated_slab_info_addrs.len(), 0);
+
     }
 
     // Alloc and free
     // Large, slab size >= page size
     // SlabInfo allocation/free
     // SlabInfo save/get
+    // With random test
     #[test]
     fn _07_free_large_ss_neq_ps() {
         const PAGE_SIZE: usize = 4096;
@@ -1728,7 +1856,47 @@ mod tests {
         // 0 free slabs, 0 full slabs
         assert_eq!(cache.free_slabs_list.iter().count(), 0);
         assert_eq!(cache.full_slabs_list.iter().count(), 0);
+        assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
+        assert_eq!(test_memory_backend_ref.allocated_slab_info_addrs.len(), 0);
 
+        // Random test
+
+        // Random number of test
+        for _ in 0..rand::thread_rng().gen_range(100..=200) {
+            let mut allocated_ptrs = Vec::new();
+
+            for _ in 10..=20 {
+                // Alloc or free
+                if rand::thread_rng().gen_bool(0.5) {
+                    // Alloc random number of objects/slabs
+                    for _ in 0..rand::thread_rng().gen_range(20..100) {
+                        let allocated_ptr = cache.alloc();
+                        assert!(!allocated_ptr.is_null());
+                        assert!(allocated_ptr.is_aligned());
+                        allocated_ptrs.push(allocated_ptr);
+                    }
+                } else {
+                    allocated_ptrs.shuffle(&mut rand::thread_rng());
+                    // Free random number of objects
+                    for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
+                        cache.free(allocated_ptrs.pop().unwrap());
+                    }
+                }
+            }
+
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
+
+            // Free all objects
+            allocated_ptrs.shuffle(&mut rand::thread_rng());
+            for v in allocated_ptrs.into_iter() {
+                cache.free(v);
+            }
+            assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
+        }
+        assert!(cache.free_slabs_list.is_empty());
+        assert!(cache.full_slabs_list.is_empty());
         assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
         assert_eq!(test_memory_backend_ref.allocated_slab_info_addrs.len(), 0);
     }
@@ -1852,6 +2020,10 @@ mod tests {
                     );
                 }
             }
+
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
 
             // Free all objects
             allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -1984,6 +2156,10 @@ mod tests {
                     }
                 }
             }
+
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
 
             // Free all objects
             allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -2131,6 +2307,10 @@ mod tests {
                 }
             }
 
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
+
             // Free all objects
             allocated_ptrs.shuffle(&mut rand::thread_rng());
             for v in allocated_ptrs.into_iter() {
@@ -2277,6 +2457,10 @@ mod tests {
                     }
                 }
             }
+
+            // All addresses are unique
+            let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
+            assert_eq!(hs.len(), allocated_ptrs.len());
 
             // Free all objects
             allocated_ptrs.shuffle(&mut rand::thread_rng());
