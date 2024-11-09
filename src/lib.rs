@@ -1,5 +1,5 @@
-//#![no_std]
-#![allow(unused)]
+#![no_std]
+extern crate alloc;
 
 use core::cell::UnsafeCell;
 use core::cmp::PartialEq;
@@ -179,7 +179,6 @@ impl<'a, T> Cache<'a, T> {
             }
         }
         // Allocate object
-        let mut free_object_ptr: *mut T = null_mut();
 
         // Get free slab info
         let free_slab_info = self.free_slabs_list.back().get().unwrap();
@@ -189,7 +188,7 @@ impl<'a, T> Cache<'a, T> {
         // Get object from FreeObject list
         let free_object_ref = free_slab_info_data.free_objects_list.pop_back().unwrap();
         free_slab_info_data.free_objects_number -= 1;
-        free_object_ptr = free_object_ref as *const _ as *mut T;
+        let free_object_ptr = free_object_ref as *const _ as *mut T;
 
         // Save SlabInfo ptr
         // TODO: Saving slab info ptr occurs for every call to alloc(), even if it is not required. Waste of performance.
@@ -199,9 +198,9 @@ impl<'a, T> Cache<'a, T> {
             debug_assert_eq!(free_object_page_addr % self.page_size, 0);
 
             // In this case we can avoid unnecessary saving for this page, if it already has allocated objects, the slab into ptr is already saved.
-            let dont_save = false;
+            let mut dont_save = false;
             if self.objects_per_slab >= 2 {
-                self.slab_size == self.page_size
+                dont_save = self.slab_size == self.page_size
                     && free_slab_info_data.free_objects_number <= self.objects_per_slab - 2;
             }
 
@@ -247,7 +246,7 @@ impl<'a, T> Cache<'a, T> {
                 // Get slab info addr from memory backend
                 let object_addr = object_ptr as usize;
                 let object_page_addr = align_down(object_addr, self.page_size);
-                let slab_info_ptr = self.memory_backend.get_slab_info_addr((object_page_addr));
+                let slab_info_ptr = self.memory_backend.get_slab_info_addr(object_page_addr);
                 debug_assert!(!slab_info_ptr.is_null());
                 debug_assert!(slab_info_ptr.is_aligned());
                 let slab_ptr = unsafe { (*(*slab_info_ptr).data.get()).slab_ptr };
@@ -277,7 +276,7 @@ impl<'a, T> Cache<'a, T> {
             if (*slab_info_ptr).data.get_mut().free_objects_number == 1 {
                 // Move slab info from full list to free
                 let mut slab_info_full_list_cursor =
-                    unsafe { self.full_slabs_list.cursor_mut_from_ptr(slab_info_ptr) };
+                    self.full_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
                 assert!(slab_info_full_list_cursor.remove().is_some());
                 self.free_slabs_list.push_back(slab_info_ref);
             }
@@ -289,7 +288,7 @@ impl<'a, T> Cache<'a, T> {
                 // All objects in slab free - free slab
                 // Remove SlabInfo from free list
                 let mut slab_info_free_list_cursor =
-                    unsafe { self.free_slabs_list.cursor_mut_from_ptr(slab_info_ptr) };
+                    self.free_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
                 debug_assert!(slab_info_free_list_cursor.remove().is_some());
                 // Free slab
                 self.memory_backend
@@ -304,8 +303,8 @@ impl<'a, T> Cache<'a, T> {
                     }
 
                     // TODO: Now we don't need to store any slab info that belongs to that slab, you should report it to the backend.
-                    for i in 0..(self.slab_size / self.page_size) {
-                        let page_addr = slab_addr + (i * self.page_size);
+                    for _i in 0..(self.slab_size / self.page_size) {
+                        //let page_addr = slab_addr + (i * self.page_size);
                         //self.memory_backend.delete_slab_info_addr(page_addr);
                     }
                 }
@@ -436,6 +435,7 @@ mod tests {
     extern crate alloc;
     extern crate std;
     use alloc::alloc::{alloc, dealloc, Layout};
+    use alloc::vec;
     use alloc::vec::Vec;
     use rand::prelude::SliceRandom;
     use rand::Rng;
@@ -452,6 +452,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
         struct TestObjectType1024 {
+            #[allow(unused)]
             a: [u64; 1024 / 8],
         }
         assert_eq!(size_of::<TestObjectType1024>(), 1024);
@@ -471,7 +472,7 @@ mod tests {
                 allocated_slab_ptr
             }
 
-            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+            fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
                 unreachable!();
             }
 
@@ -479,19 +480,19 @@ mod tests {
                 unreachable!();
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
             fn save_slab_info_addr(
                 &mut self,
-                object_page_addr: usize,
-                slab_info_ptr: *mut SlabInfo<'a>,
+                _object_page_addr: usize,
+                _slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 unreachable!();
             }
 
-            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+            fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo<'a> {
                 unreachable!();
             }
         }
@@ -578,6 +579,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
         struct TestObjectType1024 {
+            #[allow(unused)]
             a: [u64; 1024 / 8],
         }
         assert_eq!(size_of::<TestObjectType1024>(), 1024);
@@ -596,7 +598,7 @@ mod tests {
                 allocated_slab_ptr
             }
 
-            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+            fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
                 unreachable!();
             }
 
@@ -604,7 +606,7 @@ mod tests {
                 unreachable!();
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
@@ -619,7 +621,7 @@ mod tests {
                 // Get function not call's in this test
             }
 
-            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+            fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo<'a> {
                 unreachable!();
             }
         }
@@ -708,6 +710,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
         struct TestObjectType56 {
+            #[allow(unused)]
             a: [u64; 56 / 8],
         }
         assert_eq!(size_of::<TestObjectType56>(), 56);
@@ -726,7 +729,7 @@ mod tests {
                 allocated_slab_ptr
             }
 
-            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+            fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
                 unreachable!();
             }
 
@@ -736,7 +739,7 @@ mod tests {
                 unsafe { alloc(layout).cast() }
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
@@ -751,7 +754,7 @@ mod tests {
                 // Get function not call's in this test
             }
 
-            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+            fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo<'a> {
                 unreachable!();
             }
         }
@@ -830,6 +833,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
         struct TestObjectType16 {
+            #[allow(unused)]
             a: [u64; 16 / 8],
         }
         assert_eq!(size_of::<TestObjectType16>(), 16);
@@ -848,7 +852,7 @@ mod tests {
                 allocated_slab_ptr
             }
 
-            fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+            fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
                 unreachable!();
             }
 
@@ -858,7 +862,7 @@ mod tests {
                 unsafe { alloc(layout).cast() }
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
@@ -873,7 +877,7 @@ mod tests {
                 // Get function not call's in this test
             }
 
-            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+            fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo<'a> {
                 unreachable!();
             }
         }
@@ -951,6 +955,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
         struct TestObjectType512 {
+            #[allow(unused)]
             a: [u64; 512 / 8],
         }
         assert_eq!(size_of::<TestObjectType512>(), 512);
@@ -987,19 +992,19 @@ mod tests {
                 unreachable!();
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
             fn save_slab_info_addr(
                 &mut self,
-                object_page_addr: usize,
-                slab_info_ptr: *mut SlabInfo<'a>,
+                _object_page_addr: usize,
+                _slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 unreachable!();
             }
 
-            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+            fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo<'a> {
                 unreachable!();
             }
         }
@@ -1059,7 +1064,7 @@ mod tests {
 
         // Free all objects except one
         let len = first_slab_ptrs.len() - 1;
-        for i in 0..len {
+        for _ in 0..len {
             cache.free(first_slab_ptrs.pop().unwrap());
         }
         // 1 free slabs, 0 full
@@ -1067,7 +1072,7 @@ mod tests {
         assert_eq!(cache.full_slabs_list.iter().count(), 0);
 
         // Alloc again all objects
-        for i in 0..len {
+        for _ in 0..len {
             first_slab_ptrs.push(cache.alloc());
         }
         // Compare first slab ptrs copy and current
@@ -1083,7 +1088,7 @@ mod tests {
 
         // Alloc 0.5 slab
         let mut second_slab_ptrs = Vec::new();
-        for i in 0..cache.objects_per_slab / 2 {
+        for _ in 0..cache.objects_per_slab / 2 {
             second_slab_ptrs.push(cache.alloc());
             assert!(!second_slab_ptrs.last().unwrap().is_null());
             assert!(second_slab_ptrs.last().unwrap().is_aligned());
@@ -1114,7 +1119,7 @@ mod tests {
         assert_eq!(cache.full_slabs_list.iter().count(), 0);
         assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
 
-        // RANDOM
+        // Random test
 
         // Random number of test
         for _ in 0..rand::thread_rng().gen_range(100..=200) {
@@ -1168,6 +1173,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
         struct TestObjectType512 {
+            #[allow(unused)]
             a: [u64; 512 / 8],
         }
         assert_eq!(size_of::<TestObjectType512>(), 512);
@@ -1207,7 +1213,7 @@ mod tests {
                 unreachable!();
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
@@ -1295,7 +1301,7 @@ mod tests {
 
         // Free all objects except one
         let len = first_slab_ptrs.len() - 1;
-        for i in 0..len {
+        for _ in 0..len {
             cache.free(first_slab_ptrs.pop().unwrap());
         }
         // 1 free slabs, 0 full
@@ -1303,7 +1309,7 @@ mod tests {
         assert_eq!(cache.full_slabs_list.iter().count(), 0);
 
         // Alloc again all objects
-        for i in 0..len {
+        for _ in 0..len {
             first_slab_ptrs.push(cache.alloc());
         }
         // Compare first slab ptrs copy and current
@@ -1319,7 +1325,7 @@ mod tests {
 
         // Alloc 0.5 slab
         let mut second_slab_ptrs = Vec::new();
-        for i in 0..cache.objects_per_slab / 2 {
+        for _ in 0..cache.objects_per_slab / 2 {
             second_slab_ptrs.push(cache.alloc());
             assert!(!second_slab_ptrs.last().unwrap().is_null());
             assert!(second_slab_ptrs.last().unwrap().is_aligned());
@@ -1412,6 +1418,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
         struct TestObjectType512 {
+            #[allow(unused)]
             a: [u64; 512 / 8],
         }
         assert_eq!(size_of::<TestObjectType512>(), 512);
@@ -1550,7 +1557,7 @@ mod tests {
 
         // Free all objects except one
         let len = first_slab_ptrs.len() - 1;
-        for i in 0..len {
+        for _ in 0..len {
             cache.free(first_slab_ptrs.pop().unwrap());
         }
         // 1 free slabs, 0 full
@@ -1558,7 +1565,7 @@ mod tests {
         assert_eq!(cache.full_slabs_list.iter().count(), 0);
 
         // Alloc again all objects
-        for i in 0..len {
+        for _ in 0..len {
             first_slab_ptrs.push(cache.alloc());
         }
         // Compare first slab ptrs copy and current
@@ -1574,7 +1581,7 @@ mod tests {
 
         // Alloc 0.5 slab
         let mut second_slab_ptrs = Vec::new();
-        for i in 0..cache.objects_per_slab / 2 {
+        for _ in 0..cache.objects_per_slab / 2 {
             second_slab_ptrs.push(cache.alloc());
             assert!(!second_slab_ptrs.last().unwrap().is_null());
             assert!(second_slab_ptrs.last().unwrap().is_aligned());
@@ -1663,6 +1670,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
         struct TestObjectType256 {
+            #[allow(unused)]
             a: [u64; 256 / 8],
         }
         assert_eq!(size_of::<TestObjectType256>(), 256);
@@ -1801,7 +1809,7 @@ mod tests {
 
         // Free all objects except one
         let len = first_slab_ptrs.len() - 1;
-        for i in 0..len {
+        for _ in 0..len {
             cache.free(first_slab_ptrs.pop().unwrap());
         }
         // 1 free slabs, 0 full
@@ -1809,7 +1817,7 @@ mod tests {
         assert_eq!(cache.full_slabs_list.iter().count(), 0);
 
         // Alloc again all objects
-        for i in 0..len {
+        for _ in 0..len {
             first_slab_ptrs.push(cache.alloc());
         }
         // Compare first slab ptrs copy and current
@@ -1825,7 +1833,7 @@ mod tests {
 
         // Alloc 0.5 slab
         let mut second_slab_ptrs = Vec::new();
-        for i in 0..cache.objects_per_slab / 2 {
+        for _ in 0..cache.objects_per_slab / 2 {
             second_slab_ptrs.push(cache.alloc());
             assert!(!second_slab_ptrs.last().unwrap().is_null());
             assert!(second_slab_ptrs.last().unwrap().is_aligned());
@@ -1912,6 +1920,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
         struct TestObjectType3200 {
+            #[allow(unused)]
             a: [u128; 3200 / 16],
         }
         assert_eq!(size_of::<TestObjectType3200>(), 3200);
@@ -1948,19 +1957,19 @@ mod tests {
                 unreachable!();
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
             fn save_slab_info_addr(
                 &mut self,
-                object_page_addr: usize,
-                slab_info_ptr: *mut SlabInfo<'a>,
+                _object_page_addr: usize,
+                _slab_info_ptr: *mut SlabInfo<'a>,
             ) {
                 unreachable!();
             }
 
-            fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo<'a> {
+            fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo<'a> {
                 unreachable!();
             }
         }
@@ -2049,6 +2058,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
         struct TestObjectType6400 {
+            #[allow(unused)]
             a: [u128; 6400 / 16],
         }
         assert_eq!(size_of::<TestObjectType6400>(), 6400);
@@ -2086,7 +2096,7 @@ mod tests {
                 unreachable!();
             }
 
-            fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo<'a>) {
+            fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo<'a>) {
                 unreachable!();
             }
 
@@ -2185,6 +2195,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
         struct TestObjectType3200 {
+            #[allow(unused)]
             a: [u128; 3200 / 16],
         }
         assert_eq!(size_of::<TestObjectType3200>(), 3200);
@@ -2336,6 +2347,7 @@ mod tests {
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
         struct TestObjectType6400 {
+            #[allow(unused)]
             a: [u128; 6400 / 16],
         }
         assert_eq!(size_of::<TestObjectType6400>(), 6400);
