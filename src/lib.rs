@@ -1649,7 +1649,6 @@ mod tests {
         assert!(cache.full_slabs_list.is_empty());
         assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
         assert_eq!(test_memory_backend_ref.allocated_slab_info_addrs.len(), 0);
-
     }
 
     // Alloc and free
@@ -2424,7 +2423,7 @@ mod tests {
             OBJECT_SIZE_TYPE,
             &mut test_memory_backend,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(cache.objects_per_slab, 1);
 
         let allocated_ptr = cache.alloc();
