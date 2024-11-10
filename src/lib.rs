@@ -1178,7 +1178,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 128]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 376]);
                         }
@@ -1444,7 +1447,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 128]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 376]);
                         }
@@ -1716,7 +1722,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 128]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 376]);
                         }
@@ -1990,7 +1999,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 128]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 120]);
                         }
@@ -2145,7 +2157,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 2048]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 2048]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 1144]);
                         }
@@ -2313,7 +2328,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 2048]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 2048]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 4344]);
                         }
@@ -2497,7 +2515,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 1144]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 1144]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 2048]);
                         }
@@ -2681,7 +2702,10 @@ mod tests {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
                         // Check memory
                         unsafe {
-                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 4344]);
+                            assert_eq!(
+                                (*freed_ptr).first_bytes,
+                                [(*freed_ptr).first_bytes[0]; 4344]
+                            );
                             assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
                             assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 2048]);
                         }
