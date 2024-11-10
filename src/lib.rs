@@ -304,7 +304,6 @@ impl<'a, T> Cache<'a, T> {
                         self.memory_backend.free_slab_info(slab_info_ptr);
                     }
 
-                    // TODO: Now we don't need to store any slab info that belongs to that slab, you should report it to the backend.
                     for i in 0..(self.slab_size / self.page_size) {
                         let page_addr = slab_addr + (i * self.page_size);
                         self.memory_backend.delete_slab_info_addr(page_addr);
@@ -416,7 +415,7 @@ trait MemoryBackend<'a> {
     ///   Hash table good for this
     /// ```ignore
     /// // key value
-    /// hashtable.insert(object_page_addr, slab_info_ptr);
+    /// saved_slab_infos_ht.insert(object_page_addr, slab_info_ptr);
     /// ```
     ///
     ///  |   SLAB0   | <-- 1 slabs, 1 slab info<br>
@@ -437,8 +436,8 @@ trait MemoryBackend<'a> {
     /// This method is called for every page in the slab, even SlabInfo was not stored for that page.<br>
     /// If it is dangerous to delete a non-existing element in your code, you should always check if it really exists.
     /// ```ignored
-    /// if ht.key_exist(page_addr) {
-    ///     ht.remove(page_addr);
+    /// if saved_slab_infos_ht.key_exist(page_addr) {
+    ///     saved_slab_infos_ht.remove(page_addr);
     /// }
     /// ```
     fn delete_slab_info_addr(&mut self, page_addr: usize);
@@ -980,9 +979,11 @@ mod tests {
         const SLAB_SIZE: usize = 4096;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
+        #[repr(C)]
         struct TestObjectType512 {
-            #[allow(unused)]
-            a: [u64; 512 / 8],
+            first_bytes: [u8; 128], // 128
+            ptr_address: u64,       // 8
+            last_bytes: [u8; 376],  // 376
         }
         assert_eq!(size_of::<TestObjectType512>(), 512);
 
@@ -1148,7 +1149,6 @@ mod tests {
         assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
 
         // Random test
-        assert!(size_of::<TestObjectType512>() >= size_of::<usize>());
 
         // Random number of test
         for _ in 0..rand::thread_rng().gen_range(100..=200) {
@@ -1163,16 +1163,25 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 128];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 376];
+                        }
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 376]);
+                        }
                         cache.free(freed_ptr);
                     }
                 }
@@ -1206,9 +1215,11 @@ mod tests {
         const SLAB_SIZE: usize = 8192;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
+        #[repr(C)]
         struct TestObjectType512 {
-            #[allow(unused)]
-            a: [u64; 512 / 8],
+            first_bytes: [u8; 128], // 128
+            ptr_address: u64,       // 8
+            last_bytes: [u8; 376],  // 376
         }
         assert_eq!(size_of::<TestObjectType512>(), 512);
 
@@ -1418,16 +1429,25 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 128];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 376];
+                        }
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 376]);
+                        }
                         cache.free(freed_ptr);
                     }
                 }
@@ -1461,9 +1481,11 @@ mod tests {
         const SLAB_SIZE: usize = 4096;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
+        #[repr(C)]
         struct TestObjectType512 {
-            #[allow(unused)]
-            a: [u64; 512 / 8],
+            first_bytes: [u8; 128], // 128
+            ptr_address: u64,       // 8
+            last_bytes: [u8; 376],  // 376
         }
         assert_eq!(size_of::<TestObjectType512>(), 512);
 
@@ -1679,16 +1701,25 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 128];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 376];
+                        }
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 376]);
+                        }
                         cache.free(freed_ptr);
                     }
                 }
@@ -1724,9 +1755,11 @@ mod tests {
         const SLAB_SIZE: usize = 8192;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
+        #[repr(C)]
         struct TestObjectType256 {
-            #[allow(unused)]
-            a: [u64; 256 / 8],
+            first_bytes: [u8; 128], // 128
+            ptr_address: u64,       // 8
+            last_bytes: [u8; 120],  // 120
         }
         assert_eq!(size_of::<TestObjectType256>(), 256);
 
@@ -1942,16 +1975,25 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 128];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 120];
+                        }
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 128]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 120]);
+                        }
                         cache.free(freed_ptr);
                     }
                 }
@@ -1986,9 +2028,11 @@ mod tests {
         const SLAB_SIZE: usize = 4096;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
+        #[repr(C)]
         struct TestObjectType3200 {
-            #[allow(unused)]
-            a: [u128; 3200 / 16],
+            first_bytes: [u8; 2048], // 2048
+            ptr_address: u64,        // 8
+            last_bytes: [u8; 1144],  // 1144
         }
         assert_eq!(size_of::<TestObjectType3200>(), 3200);
 
@@ -2082,8 +2126,13 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 2048];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 1144];
+                        }
                     }
                     assert_eq!(
                         allocated_ptrs.len(),
@@ -2094,8 +2143,12 @@ mod tests {
                     // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 2048]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 1144]);
+                        }
                         cache.free(freed_ptr);
                     }
                     assert_eq!(
@@ -2133,9 +2186,11 @@ mod tests {
         const SLAB_SIZE: usize = 8192;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Small;
 
+        #[repr(C)]
         struct TestObjectType6400 {
-            #[allow(unused)]
-            a: [u128; 6400 / 16],
+            first_bytes: [u8; 2048], // 2048
+            ptr_address: u64,        // 8
+            last_bytes: [u8; 4344],  // 4344
         }
         assert_eq!(size_of::<TestObjectType6400>(), 6400);
 
@@ -2239,8 +2294,13 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 2048];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 4344];
+                        }
                     }
                     assert_eq!(
                         allocated_ptrs.len(),
@@ -2251,8 +2311,12 @@ mod tests {
                     // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 2048]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 4344]);
+                        }
                         cache.free(freed_ptr);
                     }
                     assert_eq!(
@@ -2292,9 +2356,11 @@ mod tests {
         const SLAB_SIZE: usize = 4096;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
+        #[repr(C)]
         struct TestObjectType3200 {
-            #[allow(unused)]
-            a: [u128; 3200 / 16],
+            first_bytes: [u8; 1144], // 1144
+            ptr_address: u64,        // 8
+            last_bytes: [u8; 2048],  // 2048
         }
         assert_eq!(size_of::<TestObjectType3200>(), 3200);
 
@@ -2412,8 +2478,13 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 1144];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 2048];
+                        }
                     }
                     assert_eq!(
                         allocated_ptrs.len(),
@@ -2424,8 +2495,12 @@ mod tests {
                     // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 1144]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 2048]);
+                        }
                         cache.free(freed_ptr);
                     }
                     assert_eq!(
@@ -2466,9 +2541,11 @@ mod tests {
         const SLAB_SIZE: usize = 8192;
         const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
+        #[repr(C)]
         struct TestObjectType6400 {
-            #[allow(unused)]
-            a: [u128; 6400 / 16],
+            first_bytes: [u8; 4344], // 4344
+            ptr_address: u64,        // 8
+            last_bytes: [u8; 2048],  // 2048
         }
         assert_eq!(size_of::<TestObjectType6400>(), 6400);
 
@@ -2585,8 +2662,13 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
-                        // Write data(address of the pointer) to allocated ptr
-                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
+                        // Fill allocated memory
+                        let random_byte: u8 = rand::thread_rng().gen_range(0u8..=255u8);
+                        unsafe {
+                            (*allocated_ptr).first_bytes = [random_byte; 4344];
+                            (*allocated_ptr).ptr_address = allocated_ptr as u64;
+                            (*allocated_ptr).last_bytes = [random_byte; 2048];
+                        }
                     }
                     assert_eq!(
                         allocated_ptrs.len(),
@@ -2597,8 +2679,12 @@ mod tests {
                     // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
                         let freed_ptr = allocated_ptrs.pop().unwrap();
-                        let data = unsafe { (freed_ptr as *mut usize).read() };
-                        assert_eq!(data, freed_ptr as usize);
+                        // Check memory
+                        unsafe {
+                            assert_eq!((*freed_ptr).first_bytes, [(*freed_ptr).first_bytes[0]; 4344]);
+                            assert_eq!((*freed_ptr).ptr_address, freed_ptr as u64);
+                            assert_eq!((*freed_ptr).last_bytes, [(*freed_ptr).last_bytes[0]; 2048]);
+                        }
                         cache.free(freed_ptr);
                     }
                     assert_eq!(
