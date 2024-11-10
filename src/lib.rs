@@ -250,7 +250,13 @@ impl<'a, T> Cache<'a, T> {
                 (slab_ptr as usize, slab_info_ptr as usize)
             }
         };
-        let free_object_ref = unsafe { &*(object_ptr as *mut FreeObject) };
+        let free_object_ptr = object_ptr as *mut FreeObject;
+        unsafe {
+            free_object_ptr.write(FreeObject {
+                free_object_link: LinkedListLink::new(),
+            })
+        };
+        let free_object_ref = unsafe { &*free_object_ptr };
         let slab_info_ptr = slab_info_addr as *mut SlabInfo;
         let slab_info_ref = unsafe { &mut *slab_info_ptr };
 
@@ -1142,6 +1148,7 @@ mod tests {
         assert_eq!(test_memory_backend_ref.allocated_slab_addrs.len(), 0);
 
         // Random test
+        assert!(size_of::<TestObjectType512>() >= size_of::<usize>());
 
         // Random number of test
         for _ in 0..rand::thread_rng().gen_range(100..=200) {
@@ -1150,18 +1157,23 @@ mod tests {
             for _ in 10..=20 {
                 // Alloc or free
                 if rand::thread_rng().gen_bool(0.5) {
-                    // Alloc random number of objects/slabs
+                    // Alloc random number of objects
                     for _ in 0..rand::thread_rng().gen_range(20..100) {
                         let allocated_ptr = cache.alloc();
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
-                    // Free random number of objects/slabs
+                    // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
                 }
             }
@@ -1400,18 +1412,23 @@ mod tests {
             for _ in 10..=20 {
                 // Alloc or free
                 if rand::thread_rng().gen_bool(0.5) {
-                    // Alloc random number of objects/slabs
+                    // Alloc random number of objects
                     for _ in 0..rand::thread_rng().gen_range(20..100) {
                         let allocated_ptr = cache.alloc();
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
-                    // Free random number of objects/slabs
+                    // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
                 }
             }
@@ -1656,18 +1673,23 @@ mod tests {
             for _ in 10..=20 {
                 // Alloc or free
                 if rand::thread_rng().gen_bool(0.5) {
-                    // Alloc random number of objects/slabs
+                    // Alloc random number of objects
                     for _ in 0..rand::thread_rng().gen_range(20..100) {
                         let allocated_ptr = cache.alloc();
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
                 }
             }
@@ -1914,18 +1936,23 @@ mod tests {
             for _ in 10..=20 {
                 // Alloc or free
                 if rand::thread_rng().gen_bool(0.5) {
-                    // Alloc random number of objects/slabs
+                    // Alloc random number of objects
                     for _ in 0..rand::thread_rng().gen_range(20..100) {
                         let allocated_ptr = cache.alloc();
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
                 }
             }
@@ -2055,6 +2082,8 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
                     assert_eq!(
                         allocated_ptrs.len(),
@@ -2064,7 +2093,10 @@ mod tests {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
                     assert_eq!(
                         allocated_ptrs.len(),
@@ -2207,13 +2239,26 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
+                    assert_eq!(
+                        allocated_ptrs.len(),
+                        test_memory_backend_ref.allocated_slab_addrs.len()
+                    );
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
                     // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
+                    assert_eq!(
+                        allocated_ptrs.len(),
+                        test_memory_backend_ref.allocated_slab_addrs.len()
+                    );
                 }
             }
 
@@ -2367,13 +2412,26 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
+                    assert_eq!(
+                        allocated_ptrs.len(),
+                        test_memory_backend_ref.allocated_slab_addrs.len()
+                    );
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
-                    // Free random number of objects
+                    // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
+                    assert_eq!(
+                        allocated_ptrs.len(),
+                        test_memory_backend_ref.allocated_slab_addrs.len()
+                    );
                 }
             }
 
@@ -2527,13 +2585,26 @@ mod tests {
                         assert!(!allocated_ptr.is_null());
                         assert!(allocated_ptr.is_aligned());
                         allocated_ptrs.push(allocated_ptr);
+                        // Write data(address of the pointer) to allocated ptr
+                        unsafe { (allocated_ptr as *mut usize).write(allocated_ptr as usize) };
                     }
+                    assert_eq!(
+                        allocated_ptrs.len(),
+                        test_memory_backend_ref.allocated_slab_addrs.len()
+                    );
                 } else {
                     allocated_ptrs.shuffle(&mut rand::thread_rng());
-                    // Free random number of objects
+                    // Free random number of objects/slabs
                     for _ in 0..rand::thread_rng().gen_range(0..=allocated_ptrs.len()) {
-                        cache.free(allocated_ptrs.pop().unwrap());
+                        let freed_ptr = allocated_ptrs.pop().unwrap();
+                        let data = unsafe { (freed_ptr as *mut usize).read() };
+                        assert_eq!(data, freed_ptr as usize);
+                        cache.free(freed_ptr);
                     }
+                    assert_eq!(
+                        allocated_ptrs.len(),
+                        test_memory_backend_ref.allocated_slab_addrs.len()
+                    );
                 }
             }
 
