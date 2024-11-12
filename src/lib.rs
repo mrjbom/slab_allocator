@@ -277,9 +277,7 @@ impl<'a, T> Cache<'a, T> {
         assert_ne!((*slab_info_ref.data.get()).free_objects_number, self.objects_per_slab, "Attempting to free an unallocated object! There are no allocated objects in this slab.");
 
         // Add object to free list
-        (*slab_info_ref
-            .data
-            .get())
+        (*slab_info_ref.data.get())
             .free_objects_list
             .push_back(free_object_ref);
         (*slab_info_ref.data.get()).free_objects_number += 1;
@@ -2830,7 +2828,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 7);
 
             // Alloc 1
@@ -3089,7 +3087,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 15);
 
             // Alloc 1
@@ -3355,7 +3353,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 8);
 
             // Alloc 1
@@ -3621,7 +3619,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 32);
 
             // Alloc 1
@@ -3853,7 +3851,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 1);
 
             // Alloc 1 object
@@ -4007,7 +4005,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 1);
 
             // Alloc 1 object
@@ -4175,7 +4173,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 1);
 
             // Alloc 1 object
@@ -4343,7 +4341,7 @@ mod tests {
                 OBJECT_SIZE_TYPE,
                 &mut test_memory_backend,
             )
-                .unwrap();
+            .unwrap();
             assert_eq!(cache.objects_per_slab, 1);
 
             // Alloc 1 object
