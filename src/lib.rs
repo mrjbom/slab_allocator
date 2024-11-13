@@ -3,10 +3,13 @@
 /// Slab cache for my OS
 ///
 /// Well-synergized with buddy allocator
+
 use core::cell::UnsafeCell;
 use core::cmp::PartialEq;
 use core::ptr::null_mut;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
+
+// TODO: It might be worth adding a Drop implementation that will free memory or panic if not all objects are freed
 
 /// Slab cache
 ///
