@@ -59,6 +59,9 @@ impl<'a, T> Cache<'a, T> {
                 "slab_size is not exactly within the page boundaries. Slab must consist of pages.",
             );
         }
+        if page_size % align_of::<T>() != 0 {
+            return Err("Type can't be aligned");
+        }
 
         // Calculate number of objects in slab
         let objects_per_slab = match object_size_type {
@@ -118,8 +121,8 @@ impl<'a, T> Cache<'a, T> {
                     // SlabInfo stored inside slab, at end
                     let slab_info_addr =
                         calculate_slab_info_addr_in_small_object_cache(slab_ptr, self.slab_size);
-                    debug_assert!(slab_info_addr > slab_ptr as usize);
-                    debug_assert!(
+                    assert!(slab_info_addr > slab_ptr as usize);
+                    assert!(
                         slab_info_addr
                             <= slab_ptr as usize + self.slab_size - size_of::<SlabInfo>()
                     );
@@ -171,7 +174,7 @@ impl<'a, T> Cache<'a, T> {
             for free_object_index in 0..self.objects_per_slab {
                 // Free object stored in slab
                 let free_object_addr = slab_ptr as usize + (free_object_index * self.object_size);
-                debug_assert_eq!(
+                assert_eq!(
                     free_object_addr % align_of::<FreeObject>(),
                     0,
                     "FreeObject addr not aligned!"
@@ -208,7 +211,7 @@ impl<'a, T> Cache<'a, T> {
         if !(self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size) {
             let free_slab_info_ptr = free_slab_info as *const _ as *mut _;
             let free_object_page_addr = align_down(free_object_ptr as usize, self.page_size);
-            debug_assert_eq!(free_object_page_addr % self.page_size, 0);
+            assert_eq!(free_object_page_addr % self.page_size, 0);
 
             // In this case we can avoid unnecessary saving for this page, if it already has allocated objects, the slab into ptr is already saved.
             let mut dont_save = false;
@@ -258,21 +261,21 @@ impl<'a, T> Cache<'a, T> {
                     slab_addr as *mut u8,
                     self.slab_size,
                 );
-                debug_assert!(slab_addr != 0);
-                debug_assert!(slab_info_addr != 0);
-                debug_assert!(slab_info_addr > slab_addr);
-                debug_assert!(slab_info_addr <= slab_addr + self.slab_size - size_of::<SlabInfo>());
-                debug_assert_eq!(slab_info_addr % align_of::<SlabInfo>(), 0);
+                assert_ne!(slab_addr, 0);
+                assert_ne!(slab_info_addr, 0);
+                assert!(slab_info_addr > slab_addr);
+                assert!(slab_info_addr <= slab_addr + self.slab_size - size_of::<SlabInfo>());
+                assert_eq!(slab_info_addr % align_of::<SlabInfo>(), 0);
                 (slab_addr, slab_info_addr)
             } else {
                 // Get slab info addr from memory backend
                 let object_addr = object_ptr as usize;
                 let object_page_addr = align_down(object_addr, self.page_size);
                 let slab_info_ptr = self.memory_backend.get_slab_info_addr(object_page_addr);
-                debug_assert!(!slab_info_ptr.is_null());
-                debug_assert!(slab_info_ptr.is_aligned());
+                assert!(!slab_info_ptr.is_null());
+                assert!(slab_info_ptr.is_aligned());
                 let slab_ptr = unsafe { (*(*slab_info_ptr).data.get()).slab_ptr };
-                debug_assert!(!slab_ptr.is_null());
+                assert!(!slab_ptr.is_null());
                 (slab_ptr as usize, slab_info_ptr as usize)
             }
         };
