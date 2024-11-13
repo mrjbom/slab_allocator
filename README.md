@@ -28,3 +28,80 @@ I spent most of the development writing tests, the allocator seems pretty well t
 I haven't tested its performance, but since it uses a doubly-linked list everywhere, it should be fast enough. Especially if the SlabInfo save/get functions are fast or not used at all.
 
 Unlike Bonwick allocator, this one does not have a contructor and destructor for objects, but only allocates Slab's memory.
+
+## Example
+
+use std::alloc::{alloc, dealloc, Layout};
+use std::collections::HashMap;
+use slab_allocator::{Cache, MemoryBackend, ObjectSizeType, SlabInfo};
+
+// Memory Backend for allocator
+struct AllocatorMemoryBackend {
+    saved_slab_infos: HashMap<usize, *mut SlabInfo>,
+}
+
+impl MemoryBackend for AllocatorMemoryBackend {
+    unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+        let layout = Layout::from_size_align(slab_size, page_size).unwrap();
+        alloc(layout)
+    }
+
+    unsafe fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+        let layout = Layout::from_size_align(slab_size, page_size).unwrap();
+        dealloc(slab_ptr, layout);
+    }
+
+    unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+        let layout = Layout::new::<SlabInfo>();
+        alloc(layout).cast()
+    }
+
+    unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+        let layout = Layout::new::<SlabInfo>();
+        dealloc(slab_info_ptr.cast(), layout);
+    }
+
+    unsafe fn save_slab_info_addr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo) {
+        self.saved_slab_infos.insert(object_page_addr, slab_info_ptr);
+    }
+
+    unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+        *self.saved_slab_infos.get(&object_page_addr).unwrap()
+    }
+
+    unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
+        if self.saved_slab_infos.contains_key(&page_addr) {
+            self.saved_slab_infos.remove(&page_addr);
+        }
+    }
+}
+
+fn main() {
+    // Init memory backend
+    let mut allocator_memory_backend = AllocatorMemoryBackend {
+        saved_slab_infos: HashMap::new(),
+    };
+
+    const SLAB_SIZE: usize = 8192;
+    const PAGE_SIZE: usize = 4096;
+    const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
+
+    struct SomeType {
+        num: u64,
+        condition: bool,
+        array: [u8; 4],
+    };
+
+    // Create cache
+    let mut cache = Cache::<SomeType>::new(SLAB_SIZE, PAGE_SIZE, OBJECT_SIZE_TYPE, &mut allocator_memory_backend).unwrap_or_else(|error| { panic!("Failed to create slab: {error}") });
+    // Alloc
+    let p1: *mut SomeType = unsafe { cache.alloc() };
+    assert!(!p1.is_null() && p1.is_aligned());
+    let p2: *mut SomeType = unsafe { cache.alloc() };
+    assert!(!p2.is_null() && p2.is_aligned());
+    // Free
+    unsafe {
+        cache.free(p1);
+        cache.free(p2);
+    }
+}
