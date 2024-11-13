@@ -418,18 +418,18 @@ pub trait MemoryBackend {
     /// Allocates slab for cache
     ///
     /// Must be page aligned
-    fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8;
+    unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8;
 
     /// Frees slab
-    fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize);
+    unsafe fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize);
 
     /// Allocs SlabInfo
     ///
     /// This function cannot be called just for the cache which: [ObjectSizeType::Small] and slab_size == page_size and can always return null
-    fn alloc_slab_info(&mut self) -> *mut SlabInfo;
+    unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo;
 
     /// Frees SlabInfo
-    fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo);
+    unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo);
 
     /// It is required to save slab_info_addr to the corresponding ***down page aligned*** object_ptr (page addr)
     ///
@@ -454,10 +454,10 @@ pub trait MemoryBackend {
     ///  |o0;o1|o2;o3| <-- 2 pages (2 pages in slab)<br>
     /// If you align the address of the object to the page, you can unambiguously refer it to the correct slab (slab page) and calculate SlabInfo by the slab page as well.<br>
     /// Not only is it incredibly wasteful to save SlabInfo for each object, but it doesn't make sense. But this trick works only when the beginning of the slab is aligned to the beginning of the page and when its size is the sum of page sizes.
-    fn save_slab_info_addr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo);
+    unsafe fn save_slab_info_addr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo);
 
     /// It is required to get slab_info_addr the corresponding ***down page aligned*** object_ptr (page addr)
-    fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo;
+    unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo;
 
     /// Notify that the SlabInfo for the page can be deleted(if exist)
     ///
@@ -472,7 +472,7 @@ pub trait MemoryBackend {
     ///     saved_slab_infos_ht.remove(page_addr);
     /// }
     /// ```
-    fn delete_slab_info_addr(&mut self, page_addr: usize);
+    unsafe fn delete_slab_info_addr(&mut self, page_addr: usize);
 }
 
 /// Not tested because it is not used in allocator work.
@@ -523,7 +523,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -533,19 +533,24 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    _slab_ptr: *mut u8,
+                    _slab_size: usize,
+                    _page_size: usize,
+                ) {
                     unreachable!();
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     _object_page_addr: usize,
                     _slab_info_ptr: *mut SlabInfo,
@@ -553,11 +558,11 @@ mod tests {
                     unreachable!();
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {
                     unreachable!();
                 }
             }
@@ -659,7 +664,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -668,19 +673,24 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    _slab_ptr: *mut u8,
+                    _slab_size: usize,
+                    _page_size: usize,
+                ) {
                     unreachable!();
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -691,11 +701,11 @@ mod tests {
                     // Get function not call's in this test
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
             }
 
             let mut test_memory_backend = TestMemoryBackend {
@@ -797,7 +807,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -806,22 +816,27 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    _slab_ptr: *mut u8,
+                    _slab_size: usize,
+                    _page_size: usize,
+                ) {
                     unreachable!();
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout =
                         Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>())
                             .unwrap();
                     unsafe { alloc(layout).cast() }
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -832,11 +847,11 @@ mod tests {
                     // Get function not call's in this test
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
             }
 
             let mut test_memory_backend = TestMemoryBackend {
@@ -928,7 +943,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -937,22 +952,27 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, _slab_ptr: *mut u8, _slab_size: usize, _page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    _slab_ptr: *mut u8,
+                    _slab_size: usize,
+                    _page_size: usize,
+                ) {
                     unreachable!();
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout =
                         Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>())
                             .unwrap();
                     unsafe { alloc(layout).cast() }
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -963,11 +983,11 @@ mod tests {
                     // Get function not call's in this test
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
             }
 
             let mut test_memory_backend = TestMemoryBackend {
@@ -1060,7 +1080,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -1070,7 +1090,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -1083,15 +1108,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     _object_page_addr: usize,
                     _slab_info_ptr: *mut SlabInfo,
@@ -1099,11 +1124,11 @@ mod tests {
                     unreachable!();
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
             }
 
             let mut test_memory_backend = TestMemoryBackend {
@@ -1327,7 +1352,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -1337,7 +1362,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -1350,15 +1380,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -1375,7 +1405,7 @@ mod tests {
                     }
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     let counter = self
                         .ht_save_get_calls_counter
@@ -1385,7 +1415,7 @@ mod tests {
                     slab_info_ptr
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -1629,7 +1659,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -1639,7 +1669,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -1652,7 +1687,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
                     assert!(!allocated_ptr.is_null());
@@ -1660,7 +1695,7 @@ mod tests {
                     allocated_ptr
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     assert!(slab_info_ptr.is_aligned());
                     let position = self
@@ -1677,7 +1712,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -1689,12 +1724,12 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     slab_info_ptr
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     assert!(self.ht_saved_slab_infos.remove(&page_addr).is_some());
                 }
             }
@@ -1935,7 +1970,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -1945,7 +1980,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -1958,7 +1998,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
                     assert!(!allocated_ptr.is_null());
@@ -1966,7 +2006,7 @@ mod tests {
                     allocated_ptr
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     assert!(slab_info_ptr.is_aligned());
                     let position = self
@@ -1983,7 +2023,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -1995,12 +2035,12 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     slab_info_ptr
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -2233,7 +2273,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -2243,7 +2283,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -2256,15 +2301,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     _object_page_addr: usize,
                     _slab_info_ptr: *mut SlabInfo,
@@ -2272,11 +2317,11 @@ mod tests {
                     unreachable!();
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
             }
 
             let mut test_memory_backend = TestMemoryBackend {
@@ -2423,7 +2468,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -2433,7 +2478,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -2446,15 +2496,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -2463,14 +2513,14 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     self.ht_saved_slab_infos
                         .get(&object_page_addr)
                         .unwrap()
                         .cast()
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -2625,7 +2675,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -2635,7 +2685,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -2648,7 +2703,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr = unsafe { alloc(layout) };
                     assert!(!allocated_ptr.is_null());
@@ -2656,7 +2711,7 @@ mod tests {
                     allocated_ptr.cast()
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     let layout = Layout::new::<SlabInfo>();
                     let position = self
@@ -2668,7 +2723,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -2677,14 +2732,14 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     self.ht_saved_slab_infos
                         .get(&object_page_addr)
                         .unwrap()
                         .cast()
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     assert!(self.ht_saved_slab_infos.remove(&page_addr).is_some());
                 }
             }
@@ -2841,7 +2896,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -2851,7 +2906,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -2864,7 +2924,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr = unsafe { alloc(layout) };
                     assert!(!allocated_ptr.is_null());
@@ -2872,7 +2932,7 @@ mod tests {
                     allocated_ptr.cast()
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     let layout = Layout::new::<SlabInfo>();
                     let position = self
@@ -2884,7 +2944,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -2893,14 +2953,14 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     self.ht_saved_slab_infos
                         .get(&object_page_addr)
                         .unwrap()
                         .cast()
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -3056,7 +3116,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -3066,7 +3126,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -3079,15 +3144,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     _object_page_addr: usize,
                     _slab_info_ptr: *mut SlabInfo,
@@ -3095,11 +3160,11 @@ mod tests {
                     unreachable!();
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
             }
 
             let mut test_memory_backend = TestMemoryBackend {
@@ -3292,7 +3357,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -3302,7 +3367,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -3315,15 +3385,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -3340,7 +3410,7 @@ mod tests {
                     }
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     let counter = self
                         .ht_save_get_calls_counter
@@ -3350,7 +3420,7 @@ mod tests {
                     slab_info_ptr
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -3551,7 +3621,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -3561,7 +3631,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -3574,7 +3649,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
                     assert!(!allocated_ptr.is_null());
@@ -3582,7 +3657,7 @@ mod tests {
                     allocated_ptr
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     assert!(slab_info_ptr.is_aligned());
                     let position = self
@@ -3599,7 +3674,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -3611,12 +3686,12 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     slab_info_ptr
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     assert!(self.ht_saved_slab_infos.remove(&page_addr).is_some());
                 }
             }
@@ -3817,7 +3892,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -3827,7 +3902,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -3840,7 +3920,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
                     assert!(!allocated_ptr.is_null());
@@ -3848,7 +3928,7 @@ mod tests {
                     allocated_ptr
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     assert!(slab_info_ptr.is_aligned());
                     let position = self
@@ -3865,7 +3945,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -3877,12 +3957,12 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     slab_info_ptr
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -4075,7 +4155,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -4085,7 +4165,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -4098,15 +4183,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     _object_page_addr: usize,
                     _slab_info_ptr: *mut SlabInfo,
@@ -4114,11 +4199,11 @@ mod tests {
                     unreachable!();
                 }
 
-                fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
             }
 
             let mut test_memory_backend = TestMemoryBackend {
@@ -4222,7 +4307,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -4232,7 +4317,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -4245,15 +4335,15 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
                     unreachable!();
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -4262,14 +4352,14 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     self.ht_saved_slab_infos
                         .get(&object_page_addr)
                         .unwrap()
                         .cast()
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -4377,7 +4467,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -4387,7 +4477,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -4400,7 +4495,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr = unsafe { alloc(layout) };
                     assert!(!allocated_ptr.is_null());
@@ -4408,7 +4503,7 @@ mod tests {
                     allocated_ptr.cast()
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     let layout = Layout::new::<SlabInfo>();
                     let position = self
@@ -4420,7 +4515,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -4429,14 +4524,14 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     self.ht_saved_slab_infos
                         .get(&object_page_addr)
                         .unwrap()
                         .cast()
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     assert!(self.ht_saved_slab_infos.remove(&page_addr).is_some());
                 }
             }
@@ -4545,7 +4640,7 @@ mod tests {
             }
 
             impl MemoryBackend for TestMemoryBackend {
-                fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
+                unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8 {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
@@ -4555,7 +4650,12 @@ mod tests {
                     allocated_slab_ptr
                 }
 
-                fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
+                unsafe fn free_slab(
+                    &mut self,
+                    slab_ptr: *mut u8,
+                    slab_size: usize,
+                    page_size: usize,
+                ) {
                     let position = self
                         .allocated_slab_addrs
                         .iter()
@@ -4568,7 +4668,7 @@ mod tests {
                     unsafe { dealloc(slab_ptr, layout) };
                 }
 
-                fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
                     let allocated_ptr = unsafe { alloc(layout) };
                     assert!(!allocated_ptr.is_null());
@@ -4576,7 +4676,7 @@ mod tests {
                     allocated_ptr.cast()
                 }
 
-                fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
+                unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo) {
                     assert!(!slab_info_ptr.is_null());
                     let layout = Layout::new::<SlabInfo>();
                     let position = self
@@ -4588,7 +4688,7 @@ mod tests {
                     unsafe { dealloc(slab_info_ptr.cast(), layout) };
                 }
 
-                fn save_slab_info_addr(
+                unsafe fn save_slab_info_addr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -4597,14 +4697,14 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     self.ht_saved_slab_infos
                         .get(&object_page_addr)
                         .unwrap()
                         .cast()
                 }
 
-                fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
