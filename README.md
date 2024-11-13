@@ -4,7 +4,7 @@ Allocator designed to allocate objects of the same size in the kernel.
 Pretty simple and was developed for my kernel, so it is supposed to be used on x86_64. It was also tested with regard to the parameters of this platform.
 
 ## How to use:
-Slab Allocator uses MemoryBackend to allocate and free memory. MemoryBackend must implement some functions, the list of required functions differs in different allocator configurations.
+Slab Allocator uses Memory Backend to allocate and free memory. Memory Backend must implement some functions, the list of required functions differs in different allocator configurations.
 
 Slab Size and Page Size | ObjectSizeType | Required Memory Backend Functions |
 | - | - | - |
