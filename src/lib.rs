@@ -24,8 +24,6 @@ pub struct Cache<'a, T> {
     full_slabs_list: LinkedList<SlabInfoAdapter>,
     memory_backend: &'a mut dyn MemoryBackend,
     phantom_data: core::marker::PhantomData<T>,
-
-    // Statistics (not tested)
     pub statistics: CacheStatistics,
 }
 
@@ -464,7 +462,7 @@ pub trait MemoryBackend {
     unsafe fn delete_slab_info_addr(&mut self, page_addr: usize);
 }
 
-/// Not tested because it is not used in allocator work.
+#[derive(Debug)]
 pub struct CacheStatistics {
     /// Number of slabs with free objects
     pub free_slabs_number: usize,
