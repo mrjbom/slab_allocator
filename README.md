@@ -31,6 +31,7 @@ Unlike Bonwick allocator, this one does not have a contructor and destructor for
 
 ## Example
 
+```
 use std::alloc::{alloc, dealloc, Layout};
 use std::collections::HashMap;
 use slab_allocator::{Cache, MemoryBackend, ObjectSizeType, SlabInfo};
@@ -105,3 +106,4 @@ fn main() {
         cache.free(p2);
     }
 }
+```
