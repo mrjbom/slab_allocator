@@ -404,8 +404,6 @@ pub trait MemoryBackend {
     fn alloc_slab_info(&mut self) -> *mut SlabInfo;
 
     /// Frees SlabInfo
-    ///
-    /// This function cannot be called just for the cache which: [ObjectSizeType::Small] and slab_size == page_size.
     fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo);
 
     /// It is required to save slab_info_addr to the corresponding ***down page aligned*** object_ptr (page addr)
@@ -438,7 +436,7 @@ pub trait MemoryBackend {
 
     /// Notify that the SlabInfo for the page can be deleted(if exist)
     ///
-    /// Called when slab memory is freed by the allocator
+    /// Called when slab is freed by the allocator
     ///
     /// # ATTENTION!
     ///
