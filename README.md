@@ -32,9 +32,9 @@ Unlike Bonwick allocator, this one does not have a contructor and destructor for
 ## Example
 
 ```
+use slab_allocator::{Cache, MemoryBackend, ObjectSizeType, SlabInfo};
 use std::alloc::{alloc, dealloc, Layout};
 use std::collections::HashMap;
-use slab_allocator::{Cache, MemoryBackend, ObjectSizeType, SlabInfo};
 
 // Memory Backend for allocator
 struct AllocatorMemoryBackend {
@@ -62,8 +62,13 @@ impl MemoryBackend for AllocatorMemoryBackend {
         dealloc(slab_info_ptr.cast(), layout);
     }
 
-    unsafe fn save_slab_info_addr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo) {
-        self.saved_slab_infos.insert(object_page_addr, slab_info_ptr);
+    unsafe fn save_slab_info_addr(
+        &mut self,
+        object_page_addr: usize,
+        slab_info_ptr: *mut SlabInfo,
+    ) {
+        self.saved_slab_infos
+            .insert(object_page_addr, slab_info_ptr);
     }
 
     unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
@@ -94,7 +99,13 @@ fn main() {
     };
 
     // Create cache
-    let mut cache = Cache::<SomeType>::new(SLAB_SIZE, PAGE_SIZE, OBJECT_SIZE_TYPE, &mut allocator_memory_backend).unwrap_or_else(|error| { panic!("Failed to create slab: {error}") });
+    let mut cache = Cache::<SomeType>::new(
+        SLAB_SIZE,
+        PAGE_SIZE,
+        OBJECT_SIZE_TYPE,
+        &mut allocator_memory_backend,
+    )
+    .unwrap_or_else(|error| panic!("Failed to create slab: {error}"));
     // Alloc
     let p1: *mut SomeType = unsafe { cache.alloc() };
     assert!(!p1.is_null() && p1.is_aligned());
@@ -106,4 +117,5 @@ fn main() {
         cache.free(p2);
     }
 }
+
 ```
