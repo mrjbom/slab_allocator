@@ -93,7 +93,7 @@ impl<'a, T> Cache<'a, T> {
                 full_slabs_number: 0,
                 free_objects_number: 0,
                 allocated_objects_number: 0,
-            }
+            },
         })
     }
 
@@ -1257,14 +1257,23 @@ mod tests {
                 assert_eq!(hs.len(), allocated_ptrs.len());
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -1540,17 +1549,29 @@ mod tests {
                 // All addresses are unique
                 let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
                 assert_eq!(hs.len(), allocated_ptrs.len());
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -1832,17 +1853,29 @@ mod tests {
                 // All addresses are unique
                 let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
                 assert_eq!(hs.len(), allocated_ptrs.len());
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -2126,17 +2159,29 @@ mod tests {
                 // All addresses are unique
                 let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
                 assert_eq!(hs.len(), allocated_ptrs.len());
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -2304,17 +2349,29 @@ mod tests {
                 // All addresses are unique
                 let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
                 assert_eq!(hs.len(), allocated_ptrs.len());
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -2491,17 +2548,29 @@ mod tests {
                 // All addresses are unique
                 let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
                 assert_eq!(hs.len(), allocated_ptrs.len());
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -2694,17 +2763,29 @@ mod tests {
                 // All addresses are unique
                 let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
                 assert_eq!(hs.len(), allocated_ptrs.len());
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
@@ -2897,21 +2978,29 @@ mod tests {
                 // All addresses are unique
                 let hs: HashSet<_> = HashSet::from_iter(allocated_ptrs.clone().into_iter());
                 assert_eq!(hs.len(), allocated_ptrs.len());
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
 
                 // Check statistics
-                assert_eq!(cache.statistics.allocated_objects_number, allocated_ptrs.len());
+                assert_eq!(
+                    cache.statistics.allocated_objects_number,
+                    allocated_ptrs.len()
+                );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
                     free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
-                assert_eq!(cache.statistics.full_slabs_number, cache.full_slabs_list.iter().count());
-                assert_eq!(cache.statistics.free_slabs_number, cache.free_slabs_list.iter().count());
-                std::println!("allocated_objects_number: {}", cache.statistics.allocated_objects_number);
-                std::println!("free_objects_number: {}", cache.statistics.free_objects_number);
-                std::println!("full_slabs_number: {}", cache.statistics.full_slabs_number);
-                std::println!("free_slabs_number: {}", cache.statistics.free_slabs_number);
+                assert_eq!(
+                    cache.statistics.full_slabs_number,
+                    cache.full_slabs_list.iter().count()
+                );
+                assert_eq!(
+                    cache.statistics.free_slabs_number,
+                    cache.free_slabs_list.iter().count()
+                );
 
                 // Free all objects
                 allocated_ptrs.shuffle(&mut rand::thread_rng());
