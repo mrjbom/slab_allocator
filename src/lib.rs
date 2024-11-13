@@ -150,21 +150,19 @@ impl<'a, T> Cache<'a, T> {
             assert!(slab_info_ptr.is_aligned());
 
             // Fill SlabInfo
-            unsafe {
-                slab_info_ptr.write(SlabInfo {
-                    slab_link: LinkedListLink::new(),
-                    data: UnsafeCell::new(SlabInfoData {
-                        free_objects_list: LinkedList::new(FreeObjectAdapter::new()),
-                        cache_ptr: self as *mut Self as *mut _,
-                        free_objects_number: self.objects_per_slab,
-                        slab_ptr,
-                    }),
-                });
-            };
+            slab_info_ptr.write(SlabInfo {
+                slab_link: LinkedListLink::new(),
+                data: UnsafeCell::new(SlabInfoData {
+                    free_objects_list: LinkedList::new(FreeObjectAdapter::new()),
+                    cache_ptr: self as *mut Self as *mut _,
+                    free_objects_number: self.objects_per_slab,
+                    slab_ptr,
+                }),
+            });
 
             // Make SlabInfo ref
-            let slab_info_ref = unsafe { UnsafeRef::from_raw(slab_info_ptr) };
-            let slab_info_data_ref = unsafe { &mut *slab_info_ref.data.get() };
+            let slab_info_ref = UnsafeRef::from_raw(slab_info_ptr);
+            let slab_info_data_ref = &mut *slab_info_ref.data.get();
             // Add SlabInfo to free list
             self.free_slabs_list.push_back(slab_info_ref);
             self.statistics.free_slabs_number += 1;
@@ -180,11 +178,9 @@ impl<'a, T> Cache<'a, T> {
                     "FreeObject addr not aligned!"
                 );
                 let free_object_ptr = free_object_addr as *mut FreeObject;
-                unsafe {
-                    free_object_ptr.write(FreeObject {
-                        free_object_link: LinkedListLink::new(),
-                    });
-                }
+                free_object_ptr.write(FreeObject {
+                    free_object_link: LinkedListLink::new(),
+                });
                 let free_object_ref = UnsafeRef::from_raw(free_object_ptr);
 
                 // Add free object to free objects list
@@ -198,7 +194,7 @@ impl<'a, T> Cache<'a, T> {
         // Get free slab info
         let free_slab_info = self.free_slabs_list.back().get().unwrap();
         // Get slab data
-        let free_slab_info_data = unsafe { &mut *free_slab_info.data.get() };
+        let free_slab_info_data = &mut *free_slab_info.data.get();
 
         // Get object from FreeObject list
         let free_object_ref = free_slab_info_data.free_objects_list.pop_back().unwrap();
@@ -274,20 +270,18 @@ impl<'a, T> Cache<'a, T> {
                 let slab_info_ptr = self.memory_backend.get_slab_info_addr(object_page_addr);
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
-                let slab_ptr = unsafe { (*(*slab_info_ptr).data.get()).slab_ptr };
+                let slab_ptr = (*(*slab_info_ptr).data.get()).slab_ptr;
                 assert!(!slab_ptr.is_null());
                 (slab_ptr as usize, slab_info_ptr as usize)
             }
         };
         let free_object_ptr = object_ptr as *mut FreeObject;
-        unsafe {
-            free_object_ptr.write(FreeObject {
-                free_object_link: LinkedListLink::new(),
-            })
-        };
-        let free_object_ref = unsafe { UnsafeRef::from_raw(free_object_ptr) };
+        free_object_ptr.write(FreeObject {
+            free_object_link: LinkedListLink::new(),
+        });
+        let free_object_ref = UnsafeRef::from_raw(free_object_ptr);
         let slab_info_ptr = slab_info_addr as *mut SlabInfo;
-        let slab_info_ref = unsafe { UnsafeRef::from_raw(slab_info_ptr) };
+        let slab_info_ref = UnsafeRef::from_raw(slab_info_ptr);
 
         // Check cache
         assert_eq!((*slab_info_ref.data.get()).cache_ptr, self as *mut _ as *mut u8, "It was not possible to verify that the object belongs to the cache. It looks like you try free an invalid address.");
@@ -302,46 +296,41 @@ impl<'a, T> Cache<'a, T> {
         self.statistics.allocated_objects_number -= 1;
 
         // Slab becomes free? (full -> free)
-        unsafe {
-            if (*slab_info_ptr).data.get_mut().free_objects_number == 1 {
-                // Move slab info from full list to free
-                let mut slab_info_full_list_cursor =
-                    self.full_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
-                self.statistics.full_slabs_number -= 1;
-                assert!(slab_info_full_list_cursor.remove().is_some());
+        if (*slab_info_ptr).data.get_mut().free_objects_number == 1 {
+            // Move slab info from full list to free
+            let mut slab_info_full_list_cursor =
+                self.full_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
+            self.statistics.full_slabs_number -= 1;
+            assert!(slab_info_full_list_cursor.remove().is_some());
 
-                self.free_slabs_list.push_back(slab_info_ref);
-                self.statistics.free_slabs_number += 1;
-            }
+            self.free_slabs_list.push_back(slab_info_ref);
+            self.statistics.free_slabs_number += 1;
         }
 
-        unsafe {
-            // List becomes empty?
-            if (*slab_info_ptr).data.get_mut().free_objects_number == self.objects_per_slab {
-                // All objects in slab free - free slab
-                // Remove SlabInfo from free list
-                let mut slab_info_free_list_cursor =
-                    self.free_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
-                assert!(slab_info_free_list_cursor.remove().is_some());
-                self.statistics.free_slabs_number -= 1;
-                self.statistics.free_objects_number -= self.objects_per_slab;
+        // List becomes empty?
+        if (*slab_info_ptr).data.get_mut().free_objects_number == self.objects_per_slab {
+            // All objects in slab free - free slab
+            // Remove SlabInfo from free list
+            let mut slab_info_free_list_cursor =
+                self.free_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
+            assert!(slab_info_free_list_cursor.remove().is_some());
+            self.statistics.free_slabs_number -= 1;
+            self.statistics.free_objects_number -= self.objects_per_slab;
 
-                // Free slab memory
-                self.memory_backend
-                    .free_slab(slab_addr as *mut u8, self.slab_size, self.page_size);
+            // Free slab memory
+            self.memory_backend
+                .free_slab(slab_addr as *mut u8, self.slab_size, self.page_size);
 
-                if !(self.object_size_type == ObjectSizeType::Small
-                    && self.slab_size == self.page_size)
-                {
-                    if self.object_size_type == ObjectSizeType::Large {
-                        // Free SlabInfo
-                        self.memory_backend.free_slab_info(slab_info_ptr);
-                    }
+            if !(self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size)
+            {
+                if self.object_size_type == ObjectSizeType::Large {
+                    // Free SlabInfo
+                    self.memory_backend.free_slab_info(slab_info_ptr);
+                }
 
-                    for i in 0..(self.slab_size / self.page_size) {
-                        let page_addr = slab_addr + (i * self.page_size);
-                        self.memory_backend.delete_slab_info_addr(page_addr);
-                    }
+                for i in 0..(self.slab_size / self.page_size) {
+                    let page_addr = slab_addr + (i * self.page_size);
+                    self.memory_backend.delete_slab_info_addr(page_addr);
                 }
             }
         }
@@ -527,7 +516,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -668,7 +657,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
                 }
@@ -811,7 +800,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
                 }
@@ -829,7 +818,7 @@ mod tests {
                     let layout =
                         Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>())
                             .unwrap();
-                    unsafe { alloc(layout).cast() }
+                    alloc(layout).cast()
                 }
 
                 unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
@@ -947,7 +936,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
                 }
@@ -965,7 +954,7 @@ mod tests {
                     let layout =
                         Layout::from_size_align(size_of::<SlabInfo>(), align_of::<SlabInfo>())
                             .unwrap();
-                    unsafe { alloc(layout).cast() }
+                    alloc(layout).cast()
                 }
 
                 unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
@@ -1084,7 +1073,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -1105,7 +1094,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -1356,7 +1345,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -1377,7 +1366,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -1663,7 +1652,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -1684,12 +1673,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
+                    let allocated_ptr: *mut SlabInfo = alloc(layout).cast();
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr
@@ -1709,7 +1698,7 @@ mod tests {
                         .any(|(_, value)| *value == slab_info_ptr));
                     self.allocated_slab_info_addrs.remove(position);
                     let layout = Layout::new::<SlabInfo>();
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
@@ -1974,7 +1963,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -1995,12 +1984,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
+                    let allocated_ptr: *mut SlabInfo = alloc(layout).cast();
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr
@@ -2020,7 +2009,7 @@ mod tests {
                         .any(|(_, value)| *value == slab_info_ptr));
                     self.allocated_slab_info_addrs.remove(position);
                     let layout = Layout::new::<SlabInfo>();
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
@@ -2277,7 +2266,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -2298,7 +2287,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -2472,7 +2461,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -2493,7 +2482,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -2679,7 +2668,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -2700,12 +2689,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr = unsafe { alloc(layout) };
+                    let allocated_ptr = alloc(layout);
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr.cast()
@@ -2720,7 +2709,7 @@ mod tests {
                         .position(|v| *v == slab_info_ptr as usize)
                         .unwrap();
                     self.allocated_slab_info_addrs.remove(position);
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
@@ -2900,7 +2889,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -2921,12 +2910,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr = unsafe { alloc(layout) };
+                    let allocated_ptr = alloc(layout);
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr.cast()
@@ -2941,7 +2930,7 @@ mod tests {
                         .position(|v| *v == slab_info_ptr as usize)
                         .unwrap();
                     self.allocated_slab_info_addrs.remove(position);
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
@@ -3120,7 +3109,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -3141,7 +3130,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -3361,7 +3350,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -3382,7 +3371,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -3625,7 +3614,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -3646,12 +3635,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
+                    let allocated_ptr: *mut SlabInfo = alloc(layout).cast();
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr
@@ -3671,7 +3660,7 @@ mod tests {
                         .any(|(_, value)| *value == slab_info_ptr));
                     self.allocated_slab_info_addrs.remove(position);
                     let layout = Layout::new::<SlabInfo>();
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
@@ -3896,7 +3885,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -3917,12 +3906,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr: *mut SlabInfo = unsafe { alloc(layout).cast() };
+                    let allocated_ptr: *mut SlabInfo = alloc(layout).cast();
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr
@@ -3942,7 +3931,7 @@ mod tests {
                         .any(|(_, value)| *value == slab_info_ptr));
                     self.allocated_slab_info_addrs.remove(position);
                     let layout = Layout::new::<SlabInfo>();
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
@@ -4159,7 +4148,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -4180,7 +4169,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -4311,7 +4300,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -4332,7 +4321,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
@@ -4471,7 +4460,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -4492,12 +4481,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr = unsafe { alloc(layout) };
+                    let allocated_ptr = alloc(layout);
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr.cast()
@@ -4512,7 +4501,7 @@ mod tests {
                         .position(|v| *v == slab_info_ptr as usize)
                         .unwrap();
                     self.allocated_slab_info_addrs.remove(position);
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
@@ -4644,7 +4633,7 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    let allocated_slab_ptr = unsafe { alloc(layout) };
+                    let allocated_slab_ptr = alloc(layout);
                     assert!(!allocated_slab_ptr.is_null());
                     self.allocated_slab_addrs.push(allocated_slab_ptr as usize);
                     allocated_slab_ptr
@@ -4665,12 +4654,12 @@ mod tests {
                     assert_eq!(slab_size, SLAB_SIZE);
                     assert_eq!(page_size, PAGE_SIZE);
                     let layout = Layout::from_size_align(slab_size, page_size).unwrap();
-                    unsafe { dealloc(slab_ptr, layout) };
+                    dealloc(slab_ptr, layout);
                 }
 
                 unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
                     let layout = Layout::new::<SlabInfo>();
-                    let allocated_ptr = unsafe { alloc(layout) };
+                    let allocated_ptr = alloc(layout);
                     assert!(!allocated_ptr.is_null());
                     self.allocated_slab_info_addrs.push(allocated_ptr as usize);
                     allocated_ptr.cast()
@@ -4685,7 +4674,7 @@ mod tests {
                         .position(|v| *v == slab_info_ptr as usize)
                         .unwrap();
                     self.allocated_slab_info_addrs.remove(position);
-                    unsafe { dealloc(slab_info_ptr.cast(), layout) };
+                    dealloc(slab_info_ptr.cast(), layout);
                 }
 
                 unsafe fn save_slab_info_addr(
