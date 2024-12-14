@@ -3,7 +3,6 @@
 /// Slab cache for my OS
 ///
 /// Well-synergized with buddy allocator
-
 use core::cell::UnsafeCell;
 use core::cmp::PartialEq;
 use core::ptr::null_mut;
