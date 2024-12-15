@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 intrusive-collections = { version = "0.9.7", default-features = false }
+spin = "0.9.8"
 
 [dev-dependencies]
 rand = "0.8.5"
+spin = "0.9.8"

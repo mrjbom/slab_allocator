@@ -6,14 +6,16 @@
 use core::cell::UnsafeCell;
 use core::cmp::PartialEq;
 use core::ptr::null_mut;
-use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
-
+use intrusive_collections::{
+    intrusive_adapter, LinkedList, LinkedListAtomicLink, LinkedListLink, UnsafeRef,
+};
+use spin::Mutex;
 // TODO: It might be worth adding a Drop implementation that will free memory or panic if not all objects are freed
 
 /// Slab cache
 ///
 /// Stores objects of the type T
-pub struct Cache<'a, T> {
+pub struct CacheType<'a, T, M: MemoryBackend + ?Sized> {
     pub object_size: usize,
     pub slab_size: usize,
     pub page_size: usize,
@@ -24,12 +26,15 @@ pub struct Cache<'a, T> {
     free_slabs_list: LinkedList<SlabInfoAdapter>,
     /// List of full slabs
     full_slabs_list: LinkedList<SlabInfoAdapter>,
-    memory_backend: &'a mut dyn MemoryBackend,
+    memory_backend: &'a mut M,
     phantom_data: core::marker::PhantomData<T>,
     pub statistics: CacheStatistics,
 }
 
-impl<'a, T> Cache<'a, T> {
+pub type Cache<'a, T> = CacheType<'a, T, dyn MemoryBackend>;
+pub type StaticCache<T> = CacheType<'static, T, dyn MemoryBackend + Send>;
+
+impl<'a, T, M: MemoryBackend + ?Sized> CacheType<'a, T, M> {
     /// slab_size must be >= page_size and must be the sum of page_size.<br>
     /// I.e. the start and end of slab must be page-aligned.<br>
     ///
@@ -43,7 +48,7 @@ impl<'a, T> Cache<'a, T> {
         slab_size: usize,
         page_size: usize,
         object_size_type: ObjectSizeType,
-        memory_backend: &'a mut dyn MemoryBackend,
+        memory_backend: &'a mut M,
     ) -> Result<Self, &'static str> {
         let object_size = size_of::<T>();
         if object_size < size_of::<FreeObject>() {
@@ -151,18 +156,18 @@ impl<'a, T> Cache<'a, T> {
 
             // Fill SlabInfo
             slab_info_ptr.write(SlabInfo {
-                slab_link: LinkedListLink::new(),
-                data: UnsafeCell::new(SlabInfoData {
+                slab_link: LinkedListAtomicLink::new(),
+                data: Mutex::new(UnsafeCell::new(SlabInfoData {
                     free_objects_list: LinkedList::new(FreeObjectAdapter::new()),
                     cache_ptr: self as *mut Self as *mut _,
                     free_objects_number: self.objects_per_slab,
                     slab_ptr,
-                }),
+                })),
             });
 
             // Make SlabInfo ref
             let slab_info_ref = UnsafeRef::from_raw(slab_info_ptr);
-            let slab_info_data_ref = &mut *slab_info_ref.data.get();
+            let slab_info_data_ref = &mut *slab_info_ref.data.lock().get();
             // Add SlabInfo to free list
             self.free_slabs_list.push_back(slab_info_ref);
             self.statistics.free_slabs_number += 1;
@@ -194,7 +199,7 @@ impl<'a, T> Cache<'a, T> {
         // Get free slab info
         let free_slab_info = self.free_slabs_list.back().get().unwrap();
         // Get slab data
-        let free_slab_info_data = &mut *free_slab_info.data.get();
+        let free_slab_info_data = &mut *free_slab_info.data.lock().get();
 
         // Get object from FreeObject list
         let free_object_ref = free_slab_info_data.free_objects_list.pop_back().unwrap();
@@ -270,7 +275,7 @@ impl<'a, T> Cache<'a, T> {
                 let slab_info_ptr = self.memory_backend.get_slab_info_addr(object_page_addr);
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
-                let slab_ptr = (*(*slab_info_ptr).data.get()).slab_ptr;
+                let slab_ptr = (*(*slab_info_ptr).data.lock().get()).slab_ptr;
                 assert!(!slab_ptr.is_null());
                 (slab_ptr as usize, slab_info_ptr as usize)
             }
@@ -284,19 +289,19 @@ impl<'a, T> Cache<'a, T> {
         let slab_info_ref = UnsafeRef::from_raw(slab_info_ptr);
 
         // Check cache
-        assert_eq!((*slab_info_ref.data.get()).cache_ptr, self as *mut _ as *mut u8, "It was not possible to verify that the object belongs to the cache. It looks like you try free an invalid address.");
-        assert_ne!((*slab_info_ref.data.get()).free_objects_number, self.objects_per_slab, "Attempting to free an unallocated object! There are no allocated objects in this slab.");
+        assert_eq!((*slab_info_ref.data.lock().get()).cache_ptr, self as *mut _ as *mut u8, "It was not possible to verify that the object belongs to the cache. It looks like you try free an invalid address.");
+        assert_ne!((*slab_info_ref.data.lock().get()).free_objects_number, self.objects_per_slab, "Attempting to free an unallocated object! There are no allocated objects in this slab.");
 
         // Add object to free list
-        (*slab_info_ref.data.get())
+        (*slab_info_ref.data.lock().get())
             .free_objects_list
             .push_back(free_object_ref);
-        (*slab_info_ref.data.get()).free_objects_number += 1;
+        (*slab_info_ref.data.lock().get()).free_objects_number += 1;
         self.statistics.free_objects_number += 1;
         self.statistics.allocated_objects_number -= 1;
 
         // Slab becomes free? (full -> free)
-        if (*slab_info_ptr).data.get_mut().free_objects_number == 1 {
+        if (*slab_info_ptr).data.lock().get_mut().free_objects_number == 1 {
             // Move slab info from full list to free
             let mut slab_info_full_list_cursor =
                 self.full_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
@@ -308,7 +313,7 @@ impl<'a, T> Cache<'a, T> {
         }
 
         // List becomes empty?
-        if (*slab_info_ptr).data.get_mut().free_objects_number == self.objects_per_slab {
+        if (*slab_info_ptr).data.lock().get_mut().free_objects_number == self.objects_per_slab {
             // All objects in slab free - free slab
             // Remove SlabInfo from free list
             let mut slab_info_free_list_cursor =
@@ -372,10 +377,12 @@ pub enum ObjectSizeType {
 /// Stored in slab(for small objects slab) or allocatated from another slab(for large objects slab)
 pub struct SlabInfo {
     /// Link to next and prev slab
-    slab_link: LinkedListLink,
+    slab_link: LinkedListAtomicLink,
     /// LinkedList doesn't give mutable access to data, we have to snip the data in UnsafeCell
-    data: UnsafeCell<SlabInfoData>,
+    data: Mutex<UnsafeCell<SlabInfoData>>,
 }
+unsafe impl Send for SlabInfo {}
+unsafe impl Sync for SlabInfo {}
 
 struct SlabInfoData {
     /// Free objects in slab list
@@ -487,7 +494,13 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
     use rand::prelude::*;
+    use spin::{Mutex, Once};
     use std::collections::{HashMap, HashSet};
+
+    #[test]
+    fn can_be_used_as_static() {
+        static S: Mutex<Once<StaticCache<i128>>> = Mutex::new(Once::new());
+    }
 
     // Allocations only
     // Small, slab size == page size
@@ -604,14 +617,29 @@ mod tests {
             assert_eq!(cache.full_slabs_list.iter().count(), 2);
             // 2 free objects
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get())
-                    .free_objects_list
-                    .iter()
-                    .count(),
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_list
+                .iter()
+                .count(),
                 2
             );
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number,
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_number,
                 2
             );
 
@@ -754,14 +782,29 @@ mod tests {
             assert_eq!(cache.full_slabs_list.iter().count(), 3);
             // 3 free objects
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get())
-                    .free_objects_list
-                    .iter()
-                    .count(),
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_list
+                .iter()
+                .count(),
                 3
             );
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number,
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_number,
                 3
             );
 
@@ -890,14 +933,29 @@ mod tests {
             assert_eq!(cache.full_slabs_list.iter().count(), 1);
             // 46 free objects
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get())
-                    .free_objects_list
-                    .iter()
-                    .count(),
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_list
+                .iter()
+                .count(),
                 46
             );
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number,
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_number,
                 46
             );
 
@@ -1024,14 +1082,29 @@ mod tests {
             assert_eq!(cache.full_slabs_list.iter().count(), 0);
             // 412 free objects
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get())
-                    .free_objects_list
-                    .iter()
-                    .count(),
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_list
+                .iter()
+                .count(),
                 412
             );
             assert_eq!(
-                (*cache.free_slabs_list.back().get().unwrap().data.get()).free_objects_number,
+                (*cache
+                    .free_slabs_list
+                    .back()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get())
+                .free_objects_number,
                 412
             );
 
@@ -1280,7 +1353,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
@@ -1583,7 +1656,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
@@ -1892,7 +1965,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
@@ -2203,7 +2276,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
@@ -2398,7 +2471,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
@@ -2602,7 +2675,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
@@ -2822,7 +2895,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
@@ -3042,7 +3115,7 @@ mod tests {
                 );
                 let mut free_objects_counter = 0;
                 for free_slab_info in cache.free_slabs_list.iter() {
-                    free_objects_counter += (*free_slab_info.data.get()).free_objects_number;
+                    free_objects_counter += (*free_slab_info.data.lock().get()).free_objects_number;
                 }
                 assert_eq!(cache.statistics.free_objects_number, free_objects_counter);
                 assert_eq!(
