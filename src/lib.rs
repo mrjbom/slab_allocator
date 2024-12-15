@@ -499,7 +499,60 @@ mod tests {
 
     #[test]
     fn can_be_used_as_static() {
-        static S: Mutex<Once<StaticCache<i128>>> = Mutex::new(Once::new());
+        static STATIC_CACHE: Mutex<Once<StaticCache<i128>>> = Mutex::new(Once::new());
+
+        struct TestMemoryBackend;
+        static mut TEST_MEMORY_BACKEND: TestMemoryBackend = TestMemoryBackend;
+
+        unsafe impl Send for TestMemoryBackend {}
+
+        impl MemoryBackend for TestMemoryBackend {
+            unsafe fn alloc_slab(&mut self, _slab_size: usize, _page_size: usize) -> *mut u8 {
+                unreachable!();
+            }
+
+            unsafe fn free_slab(
+                &mut self,
+                _slab_ptr: *mut u8,
+                _slab_size: usize,
+                _page_size: usize,
+            ) {
+                unreachable!();
+            }
+
+            unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo {
+                unreachable!();
+            }
+
+            unsafe fn free_slab_info(&mut self, _slab_info_ptr: *mut SlabInfo) {
+                unreachable!();
+            }
+
+            unsafe fn save_slab_info_addr(
+                &mut self,
+                _object_page_addr: usize,
+                _slab_info_ptr: *mut SlabInfo,
+            ) {
+                unreachable!();
+            }
+
+            unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unreachable!();
+            }
+
+            unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {
+                unreachable!();
+            }
+        }
+
+        // TODO: We've got to come up with something intelligible. Perhaps it will accept Mutex<&mut ...>? instead of &mut ...?
+        #[allow(static_mut_refs)]
+        unsafe {
+            STATIC_CACHE.lock().call_once(|| {
+                StaticCache::new(4096, 4096, ObjectSizeType::Small, &mut TEST_MEMORY_BACKEND)
+                    .unwrap()
+            });
+        }
     }
 
     // Allocations only
