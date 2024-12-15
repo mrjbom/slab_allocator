@@ -10,7 +10,7 @@ use intrusive_collections::{
     intrusive_adapter, LinkedList, LinkedListAtomicLink, LinkedListLink, UnsafeRef,
 };
 use spin::Mutex;
-// TODO: It might be worth adding a Drop implementation that will free memory or panic if not all objects are freed
+// TODO: It might be worth adding a Drop implementation that will panic if not all objects are freed
 
 /// Slab cache
 ///
@@ -206,7 +206,6 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         let free_object_ptr = UnsafeRef::<FreeObject>::into_raw(free_object_ref);
 
         // Save SlabInfo ptr
-        // TODO: Saving slab info ptr occurs for every call to alloc(), even if it is not required. Waste of performance.
         if !(self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size) {
             let free_slab_info_ptr = free_slab_info as *const _ as *mut _;
             let free_object_page_addr = align_down(free_object_ptr as usize, self.page_size);
