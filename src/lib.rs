@@ -16,19 +16,19 @@ use spin::Mutex;
 ///
 /// Stores objects of the type T
 pub struct Cache<T, M: MemoryBackend + Sized> {
-    pub object_size: usize,
-    pub slab_size: usize,
-    pub page_size: usize,
-    pub object_size_type: ObjectSizeType,
+    object_size: usize,
+    slab_size: usize,
+    page_size: usize,
+    object_size_type: ObjectSizeType,
     /// Total objects in slab
-    pub objects_per_slab: usize,
+    objects_per_slab: usize,
     /// List of slabs with free objects
     free_slabs_list: LinkedList<SlabInfoAdapter>,
     /// List of full slabs
     full_slabs_list: LinkedList<SlabInfoAdapter>,
     memory_backend: M,
     phantom_data: core::marker::PhantomData<T>,
-    pub statistics: CacheStatistics,
+    statistics: CacheStatistics,
 }
 
 impl<T, M: MemoryBackend + Sized> Cache<T, M> {
@@ -210,7 +210,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         if !(self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size) {
             let free_slab_info_ptr = free_slab_info as *const _ as *mut _;
             let free_object_page_addr = align_down(free_object_ptr as usize, self.page_size);
-            assert_eq!(free_object_page_addr % self.page_size, 0);
+            debug_assert_eq!(free_object_page_addr % self.page_size, 0);
 
             // In this case we can avoid unnecessary saving for this page, if it already has allocated objects, the slab into ptr is already saved.
             let mut dont_save = false;
@@ -262,8 +262,8 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
                 );
                 assert_ne!(slab_addr, 0);
                 assert_ne!(slab_info_addr, 0);
-                assert!(slab_info_addr > slab_addr);
-                assert!(slab_info_addr <= slab_addr + self.slab_size - size_of::<SlabInfo>());
+                debug_assert!(slab_info_addr > slab_addr);
+                debug_assert!(slab_info_addr <= slab_addr + self.slab_size - size_of::<SlabInfo>());
                 assert_eq!(slab_info_addr % align_of::<SlabInfo>(), 0);
                 (slab_addr, slab_info_addr)
             } else {
@@ -338,6 +338,36 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
             }
         }
     }
+
+    /// Gets object size in bytes
+    pub fn object_size(&self) -> usize {
+        self.object_size
+    }
+
+    /// Gets slab size in bytes
+    pub fn slab_size(&self) -> usize {
+        self.slab_size
+    }
+
+    /// Gets page size in bytes
+    pub fn page_size(&self) -> usize {
+        self.page_size
+    }
+
+    /// Gets ObjectSizeType
+    pub fn object_size_type(&self) -> ObjectSizeType {
+        self.object_size_type
+    }
+
+    /// Gets objects per slab in bytes
+    pub fn objects_per_slab(&self) -> usize {
+        self.objects_per_slab
+    }
+
+    /// Gets cache statistics
+    pub fn cache_statistics(&self) -> CacheStatistics {
+        self.statistics
+    }
 }
 
 fn calculate_slab_info_addr_in_small_object_cache(slab_ptr: *mut u8, slab_size: usize) -> usize {
@@ -350,8 +380,8 @@ fn align_down(addr: usize, align: usize) -> usize {
     addr & !(align - 1)
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
 /// See [ObjectSizeType::Small] and [ObjectSizeType::Large]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ObjectSizeType {
     /// For small size objects, SlabInfo is stored directly in slab and little memory is lost.<br>
     /// For example:<br>
@@ -369,10 +399,10 @@ pub enum ObjectSizeType {
     Large,
 }
 
-#[repr(C)]
 /// Slab info
 ///
 /// Stored in slab(for small objects slab) or allocatated from another slab(for large objects slab)
+#[repr(C)]
 pub struct SlabInfo {
     /// Link to next and prev slab
     slab_link: LinkedListAtomicLink,
@@ -471,7 +501,7 @@ pub trait MemoryBackend {
     unsafe fn delete_slab_info_addr(&mut self, page_addr: usize);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CacheStatistics {
     /// Number of slabs with free objects
     pub free_slabs_number: usize,
