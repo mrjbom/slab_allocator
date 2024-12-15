@@ -83,14 +83,10 @@ impl MemoryBackend for AllocatorMemoryBackend {
 }
 
 fn main() {
-    // Init memory backend
-    let mut allocator_memory_backend = AllocatorMemoryBackend {
+    // Create memory backend
+    let allocator_memory_backend = AllocatorMemoryBackend {
         saved_slab_infos: HashMap::new(),
     };
-
-    const SLAB_SIZE: usize = 8192;
-    const PAGE_SIZE: usize = 4096;
-    const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
 
     struct SomeType {
         num: u64,
@@ -98,24 +94,29 @@ fn main() {
         array: [u8; 4],
     };
 
+    const SLAB_SIZE: usize = 8192;
+    const PAGE_SIZE: usize = 4096;
+    const OBJECT_SIZE_TYPE: ObjectSizeType = ObjectSizeType::Large;
+
     // Create cache
-    let mut cache = Cache::<SomeType>::new(
+    let mut cache = Cache::<SomeType, AllocatorMemoryBackend>::new(
         SLAB_SIZE,
         PAGE_SIZE,
         OBJECT_SIZE_TYPE,
-        &mut allocator_memory_backend,
+        allocator_memory_backend,
     )
-    .unwrap_or_else(|error| panic!("Failed to create slab: {error}"));
-    // Alloc
-    let p1: *mut SomeType = unsafe { cache.alloc() };
-    assert!(!p1.is_null() && p1.is_aligned());
-    let p2: *mut SomeType = unsafe { cache.alloc() };
-    assert!(!p2.is_null() && p2.is_aligned());
-    // Free
+    .unwrap_or_else(|error| panic!("Failed to create cache: {error}"));
+
     unsafe {
+        // Allocate
+        let p1: *mut SomeType = cache.alloc();
+        assert!(!p1.is_null() && p1.is_aligned());
+        let p2: *mut SomeType = cache.alloc();
+        assert!(!p2.is_null() && p2.is_aligned());
+
+        // Free
         cache.free(p1);
         cache.free(p2);
     }
 }
-
 ```
