@@ -165,7 +165,6 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
 
             // Make SlabInfo ref
             let slab_info_ref = UnsafeRef::from_raw(slab_info_ptr);
-            let slab_info_data_ref = &mut *slab_info_ref.data.lock().get();
             // Add SlabInfo to free list
             self.free_slabs_list.push_back(slab_info_ref);
             self.statistics.free_slabs_number += 1;
@@ -187,7 +186,13 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
                 let free_object_ref = UnsafeRef::from_raw(free_object_ptr);
 
                 // Add free object to free objects list
-                slab_info_data_ref
+                self.free_slabs_list
+                    .front()
+                    .get()
+                    .unwrap()
+                    .data
+                    .lock()
+                    .get_mut()
                     .free_objects_list
                     .push_back(free_object_ref);
             }
@@ -195,7 +200,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         // Allocate object
 
         // Get free slab info
-        let free_slab_info = self.free_slabs_list.back().get().unwrap();
+        let free_slab_info = self.free_slabs_list.front().get().unwrap();
         // Get slab data
         let free_slab_info_data = &mut *free_slab_info.data.lock().get();
 
@@ -224,11 +229,11 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
             }
         }
 
-        // Check free objects list
+        // Slab became empty?
         if free_slab_info_data.free_objects_list.is_empty() {
             // Slab is empty now
             // Remove from free list
-            let free_slab_info = self.free_slabs_list.pop_back().unwrap();
+            let free_slab_info = self.free_slabs_list.pop_front().unwrap();
             self.statistics.free_slabs_number -= 1;
             // Add to full list
             self.full_slabs_list.push_back(free_slab_info);
@@ -241,7 +246,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
 
     /// Returns object to cache
     ///
-    /// Safety
+    /// # Safety
     /// Pointer must be a previously allocated pointer from the same cache
     pub unsafe fn free(&mut self, object_ptr: *mut T) {
         assert!(!object_ptr.is_null(), "Try to free null ptr");
@@ -250,7 +255,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
             "Try to free null ptr (aligned pointer has been allocated)"
         );
 
-        // Get slab_addr and slab_info_addr
+        // Calculate/Get slab_addr and slab_info_addr
         let (slab_addr, slab_info_addr) = {
             if self.object_size_type == ObjectSizeType::Small && self.slab_size == self.page_size {
                 // In this case we may calculate slab info addr
@@ -281,13 +286,15 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         free_object_ptr.write(FreeObject {
             free_object_link: LinkedListLink::new(),
         });
+
+        // Return object to slab
         let free_object_ref = UnsafeRef::from_raw(free_object_ptr);
         let slab_info_ptr = slab_info_addr as *mut SlabInfo;
         let slab_info_ref = UnsafeRef::from_raw(slab_info_ptr);
 
         // Check cache
         assert_eq!((*slab_info_ref.data.lock().get()).cache_ptr, self as *mut _ as *mut u8, "It was not possible to verify that the object belongs to the cache. It looks like you try free an invalid address.");
-        assert_ne!((*slab_info_ref.data.lock().get()).free_objects_number, self.objects_per_slab, "Attempting to free an unallocated object! There are no allocated objects in this slab.");
+        assert_ne!((*slab_info_ref.data.lock().get()).free_objects_number, self.objects_per_slab, "Attempting to free an unallocated object! There are no allocated objects in this slab. It looks like invalid address or double free.");
 
         // Add object to free list
         (*slab_info_ref.data.lock().get())
@@ -297,21 +304,23 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         self.statistics.free_objects_number += 1;
         self.statistics.allocated_objects_number -= 1;
 
-        // Slab becomes free? (full -> free)
-        if (*slab_info_ptr).data.lock().get_mut().free_objects_number == 1 {
+        // Slab became free? (full -> free)
+        if slab_info_ref.data.lock().get_mut().free_objects_number == 1 {
             // Move slab info from full list to free
             let mut slab_info_full_list_cursor =
                 self.full_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
             self.statistics.full_slabs_number -= 1;
             assert!(slab_info_full_list_cursor.remove().is_some());
 
-            self.free_slabs_list.push_back(slab_info_ref);
+            // Add slab to start
+            // It is more likely to be used again because when we alloc object, we take slab from the front
+            self.free_slabs_list.push_front(slab_info_ref);
             self.statistics.free_slabs_number += 1;
         }
 
         // List becomes empty?
         if (*slab_info_ptr).data.lock().get_mut().free_objects_number == self.objects_per_slab {
-            // All objects in slab free - free slab
+            // All objects in slab is free - free slab
             // Remove SlabInfo from free list
             let mut slab_info_free_list_cursor =
                 self.free_slabs_list.cursor_mut_from_ptr(slab_info_ptr);
@@ -329,7 +338,6 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
                     // Free SlabInfo
                     self.memory_backend.free_slab_info(slab_info_ptr);
                 }
-
                 for i in 0..(self.slab_size / self.page_size) {
                     let page_addr = slab_addr + (i * self.page_size);
                     self.memory_backend.delete_slab_info_addr(page_addr);
@@ -442,6 +450,7 @@ intrusive_adapter!(FreeObjectAdapter = UnsafeRef<FreeObject>: FreeObject { free_
 pub trait MemoryBackend {
     /// Allocates slab for cache
     ///
+    /// # Safety
     /// Must be page aligned
     unsafe fn alloc_slab(&mut self, slab_size: usize, page_size: usize) -> *mut u8;
 
@@ -449,8 +458,6 @@ pub trait MemoryBackend {
     unsafe fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize);
 
     /// Allocs SlabInfo
-    ///
-    /// This function cannot be called just for the cache which: [ObjectSizeType::Small] and slab_size == page_size and can always return null
     unsafe fn alloc_slab_info(&mut self) -> *mut SlabInfo;
 
     /// Frees SlabInfo
