@@ -229,7 +229,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
             }
         }
 
-        // Slab became empty?
+        // Slab become empty?
         if free_slab_info_data.free_objects_list.is_empty() {
             // Slab is empty now
             // Remove from free list
@@ -304,7 +304,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         self.statistics.free_objects_number += 1;
         self.statistics.allocated_objects_number -= 1;
 
-        // Slab became free? (full -> free)
+        // Slab become free? (full -> free)
         if slab_info_ref.data.lock().get_mut().free_objects_number == 1 {
             // Move slab info from full list to free
             let mut slab_info_full_list_cursor =
@@ -387,7 +387,7 @@ fn align_down(addr: usize, align: usize) -> usize {
     addr & !(align - 1)
 }
 
-/// See [ObjectSizeType::Small] and [ObjectSizeType::Large]
+/// See README.md, [ObjectSizeType::Small] and [ObjectSizeType::Large]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ObjectSizeType {
     /// For small size objects, SlabInfo is stored directly in slab and little memory is lost.<br>
@@ -463,7 +463,7 @@ pub trait MemoryBackend {
     /// Frees SlabInfo
     unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo);
 
-    /// It is required to save slab_info_addr to the corresponding ***down page aligned*** object_ptr (page addr)
+    /// It is required to save slab_info_addr to the corresponding object page addr
     ///
     /// This function cannot be called just for the cache which: [ObjectSizeType::Small] and slab_size == page_size.<br>
     /// In this case the allocator is able to calculate its address itself.
@@ -488,7 +488,7 @@ pub trait MemoryBackend {
     /// Not only is it incredibly wasteful to save SlabInfo for each object, but it doesn't make sense. But this trick works only when the beginning of the slab is aligned to the beginning of the page and when its size is the sum of page sizes.
     unsafe fn save_slab_info_addr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo);
 
-    /// It is required to get slab_info_addr the corresponding ***down page aligned*** object_ptr (page addr)
+    /// It is required to get slab_info_addr to the corresponding object page addr
     unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo;
 
     /// Notify that the SlabInfo for the page can be deleted(if exist)
@@ -515,7 +515,7 @@ pub struct CacheStatistics {
     pub full_slabs_number: usize,
     /// Number of objects in cache available for allocation without Slab allocation
     pub free_objects_number: usize,
-    /// Number of objects in cache allocated from slab
+    /// Number of objects in cache allocated from Cache
     pub allocated_objects_number: usize,
 }
 
