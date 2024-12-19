@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-/// Slab cache for my OS
+/// Slab allocator for my OS
 ///
 /// Well-synergized with buddy allocator
 use core::cell::UnsafeCell;
