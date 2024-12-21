@@ -2126,6 +2126,15 @@ mod tests {
             assert_eq!(cache.free_slabs_list_occupacy_less_75.iter().count(), 0);
             assert_eq!(cache.free_slabs_list_occupacy_more_75.iter().count(), 0);
             assert_eq!(cache.full_slabs_list.iter().count(), 0);
+            assert_eq!(cache.memory_backend.allocated_slab_addrs.len(), 0);
+            assert_eq!(cache.memory_backend.allocated_slab_info_addrs.len(), 0);
+            assert!(cache.memory_backend.ht_saved_slab_infos.is_empty());
+
+            // Check statistics
+            assert_eq!(cache.statistics.free_slabs_number, 0);
+            assert_eq!(cache.statistics.full_slabs_number, 0);
+            assert_eq!(cache.statistics.allocated_objects_number, 0);
+            assert_eq!(cache.statistics.free_objects_number, 0);
         }
     }
 }
