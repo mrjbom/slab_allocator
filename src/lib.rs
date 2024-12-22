@@ -61,6 +61,11 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         if !slab_size.is_power_of_two() {
             return Err("Slab size is not power of two");
         }
+
+        if page_size % align_of::<T>() != 0 {
+            return Err("Type can't be aligned");
+        }
+
         let object_size = size_of::<T>();
         if object_size < size_of::<FreeObject>() {
             return Err("Object size smaller than 8/16 (two pointers)");
@@ -69,9 +74,6 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
             if slab_size < size_of::<SlabInfo>() + object_size {
                 return Err("Slab size is too small");
             }
-        }
-        if page_size % align_of::<T>() != 0 {
-            return Err("Type can't be aligned");
         }
         assert_eq!(size_of::<FreeObject>(), size_of::<*const u8>() * 2);
 
