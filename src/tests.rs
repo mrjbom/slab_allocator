@@ -45,7 +45,7 @@ mod tests {
                 unreachable!();
             }
 
-            unsafe fn save_slab_info_addr(
+            unsafe fn save_slab_info_ptr(
                 &mut self,
                 _object_page_addr: usize,
                 _slab_info_ptr: *mut SlabInfo,
@@ -53,11 +53,11 @@ mod tests {
                 unreachable!();
             }
 
-            unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+            unsafe fn get_slab_info_ptr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                 unreachable!();
             }
 
-            unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {
+            unsafe fn delete_slab_info_ptr(&mut self, _page_addr: usize) {
                 unreachable!();
             }
         }
@@ -112,7 +112,7 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     _object_page_addr: usize,
                     _slab_info_ptr: *mut SlabInfo,
@@ -120,11 +120,11 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {
+                unsafe fn delete_slab_info_ptr(&mut self, _page_addr: usize) {
                     unreachable!();
                 }
             }
@@ -269,7 +269,7 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -280,11 +280,11 @@ mod tests {
                     // Get function not call's in this test
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_ptr(&mut self, _page_addr: usize) {}
             }
 
             let test_memory_backend = TestMemoryBackend {
@@ -435,7 +435,7 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -446,11 +446,11 @@ mod tests {
                     // Get function not call's in this test
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_ptr(&mut self, _page_addr: usize) {}
             }
 
             let test_memory_backend = TestMemoryBackend {
@@ -601,7 +601,7 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -612,11 +612,11 @@ mod tests {
                     // Get function not call's in this test
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_ptr(&mut self, _page_addr: usize) {}
             }
 
             let test_memory_backend = TestMemoryBackend {
@@ -771,7 +771,7 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     _object_page_addr: usize,
                     _slab_info_ptr: *mut SlabInfo,
@@ -779,11 +779,11 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, _object_page_addr: usize) -> *mut SlabInfo {
                     unreachable!();
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, _page_addr: usize) {}
+                unsafe fn delete_slab_info_ptr(&mut self, _page_addr: usize) {}
             }
 
             let test_memory_backend = TestMemoryBackend {
@@ -1047,7 +1047,7 @@ mod tests {
                     unreachable!();
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -1064,7 +1064,7 @@ mod tests {
                     }
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     let counter = self
                         .ht_save_get_calls_counter
@@ -1074,7 +1074,7 @@ mod tests {
                     slab_info_ptr
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_ptr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -1377,7 +1377,7 @@ mod tests {
                     dealloc(slab_info_ptr.cast(), layout);
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -1389,12 +1389,12 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     slab_info_ptr
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_ptr(&mut self, page_addr: usize) {
                     assert!(self.ht_saved_slab_infos.remove(&page_addr).is_some());
                 }
             }
@@ -1687,7 +1687,7 @@ mod tests {
                     dealloc(slab_info_ptr.cast(), layout);
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -1699,12 +1699,12 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     slab_info_ptr
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_ptr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }
@@ -1997,7 +1997,7 @@ mod tests {
                     dealloc(slab_info_ptr.cast(), layout);
                 }
 
-                unsafe fn save_slab_info_addr(
+                unsafe fn save_slab_info_ptr(
                     &mut self,
                     object_page_addr: usize,
                     slab_info_ptr: *mut SlabInfo,
@@ -2009,12 +2009,12 @@ mod tests {
                         .insert(object_page_addr, slab_info_ptr);
                 }
 
-                unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+                unsafe fn get_slab_info_ptr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
                     let slab_info_ptr = *self.ht_saved_slab_infos.get(&object_page_addr).unwrap();
                     slab_info_ptr
                 }
 
-                unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
+                unsafe fn delete_slab_info_ptr(&mut self, page_addr: usize) {
                     self.ht_saved_slab_infos.remove(&page_addr);
                 }
             }

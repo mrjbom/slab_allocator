@@ -250,7 +250,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
 
             if !dont_save {
                 self.memory_backend
-                    .save_slab_info_addr(free_object_page_addr, free_slab_info_ptr);
+                    .save_slab_info_ptr(free_object_page_addr, free_slab_info_ptr);
             }
         }
 
@@ -318,7 +318,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
                 // Get slab info addr from memory backend
                 let object_addr = object_ptr as usize;
                 let object_page_addr = align_down(object_addr, self.page_size);
-                let slab_info_ptr = self.memory_backend.get_slab_info_addr(object_page_addr);
+                let slab_info_ptr = self.memory_backend.get_slab_info_ptr(object_page_addr);
                 assert!(!slab_info_ptr.is_null());
                 assert!(slab_info_ptr.is_aligned());
                 let slab_ptr = (*(*slab_info_ptr).data.get()).slab_ptr;
@@ -404,7 +404,7 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
                 }
                 for i in 0..(self.slab_size / self.page_size) {
                     let page_addr = slab_addr + (i * self.page_size);
-                    self.memory_backend.delete_slab_info_addr(page_addr);
+                    self.memory_backend.delete_slab_info_ptr(page_addr);
                 }
             }
         }
@@ -530,7 +530,7 @@ pub trait MemoryBackend {
     /// Frees SlabInfo
     unsafe fn free_slab_info(&mut self, slab_info_ptr: *mut SlabInfo);
 
-    /// It is required to save slab_info_addr to the corresponding object page addr
+    /// It is required to save slab_info_ptr to the corresponding object page addr
     ///
     /// This function cannot be called just for the cache which: [ObjectSizeType::Small] and slab_size == page_size.<br>
     /// In this case the allocator is able to calculate its address itself.
@@ -553,10 +553,10 @@ pub trait MemoryBackend {
     ///  |o0;o1|o2;o3| <-- 2 pages (2 pages in slab)<br>
     /// If you align the address of the object to the page, you can unambiguously refer it to the correct slab (slab page) and calculate SlabInfo by the slab page as well.<br>
     /// Not only is it incredibly wasteful to save SlabInfo for each object, but it doesn't make sense. But this trick works only when the beginning of the slab is aligned to the beginning of the page and when its size is the sum of page sizes.
-    unsafe fn save_slab_info_addr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo);
+    unsafe fn save_slab_info_ptr(&mut self, object_page_addr: usize, slab_info_ptr: *mut SlabInfo);
 
-    /// It is required to get slab_info_addr to the corresponding object page addr
-    unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo;
+    /// It is required to get slab_info_ptr to the corresponding object page addr
+    unsafe fn get_slab_info_ptr(&mut self, object_page_addr: usize) -> *mut SlabInfo;
 
     /// Notify that the SlabInfo for the page can be deleted(if exist)
     ///
@@ -571,7 +571,7 @@ pub trait MemoryBackend {
     ///     saved_slab_infos_ht.remove(page_addr);
     /// }
     /// ```
-    unsafe fn delete_slab_info_addr(&mut self, page_addr: usize);
+    unsafe fn delete_slab_info_ptr(&mut self, page_addr: usize);
 }
 
 #[derive(Debug, Clone, Copy)]

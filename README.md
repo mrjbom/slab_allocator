@@ -62,7 +62,7 @@ impl MemoryBackend for AllocatorMemoryBackend {
         dealloc(slab_info_ptr.cast(), layout);
     }
 
-    unsafe fn save_slab_info_addr(
+    unsafe fn save_slab_info_ptr(
         &mut self,
         object_page_addr: usize,
         slab_info_ptr: *mut SlabInfo,
@@ -71,11 +71,11 @@ impl MemoryBackend for AllocatorMemoryBackend {
             .insert(object_page_addr, slab_info_ptr);
     }
 
-    unsafe fn get_slab_info_addr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
+    unsafe fn get_slab_info_ptr(&mut self, object_page_addr: usize) -> *mut SlabInfo {
         *self.saved_slab_infos.get(&object_page_addr).unwrap()
     }
 
-    unsafe fn delete_slab_info_addr(&mut self, page_addr: usize) {
+    unsafe fn delete_slab_info_ptr(&mut self, page_addr: usize) {
         if self.saved_slab_infos.contains_key(&page_addr) {
             self.saved_slab_infos.remove(&page_addr);
         }
