@@ -53,6 +53,14 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
         object_size_type: ObjectSizeType,
         memory_backend: M,
     ) -> Result<Self, &'static str> {
+        if slab_size % page_size != 0 {
+            return Err(
+                "slab_size is not exactly within the page boundaries. Slab must consist of pages.",
+            );
+        }
+        if !slab_size.is_power_of_two() {
+            return Err("Slab size is not power of two");
+        }
         let object_size = size_of::<T>();
         if object_size < size_of::<FreeObject>() {
             return Err("Object size smaller than 8/16 (two pointers)");
@@ -61,11 +69,6 @@ impl<T, M: MemoryBackend + Sized> Cache<T, M> {
             if slab_size < size_of::<SlabInfo>() + object_size {
                 return Err("Slab size is too small");
             }
-        }
-        if slab_size % page_size != 0 {
-            return Err(
-                "slab_size is not exactly within the page boundaries. Slab must consist of pages.",
-            );
         }
         if page_size % align_of::<T>() != 0 {
             return Err("Type can't be aligned");
